@@ -1,0 +1,77 @@
+name: ci
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      # Redis arrives with Phase 2 (BullMQ, sessions, Socket.io fan-out). Not declared
+      # here yet — an unused service container is just a slower build.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: deepsight
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: ['5432:5432']
+
+    env:
+      # Superuser: bootstrap only (CREATE ROLE requires it).
+      ADMIN_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/deepsight
+      # deepsight_owner: migrations, seeds and schema lint. Never application code.
+      DATABASE_URL_OWNER: postgres://deepsight_owner:owner_local_only@127.0.0.1:5432/deepsight
+      # deepsight_app: every integration test, as every application query path will be.
+      DATABASE_URL: postgres://deepsight_app:app_local_only@127.0.0.1:5432/deepsight
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes)
+        run: pnpm -r typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format
+
+      - name: apps/ vs packages/ boundaries
+        run: pnpm check:boundaries
+
+      - run: pnpm test:unit
+
+      - name: Bootstrap database roles
+        run: pnpm db:bootstrap
+
+      # Applied here as well as by the integration suite's global setup, so the
+      # standalone commands are exercised — a migration path that only ever runs from
+      # inside a test harness is a migration path nobody has actually deployed.
+      - run: pnpm db:migrate
+      - run: pnpm db:seed
+
+      - name: Schema lint (tenancy + binary-column rules)
+        run: pnpm db:lint
+
+      # Connects as deepsight_app, never as owner. Running these as owner is how RLS
+      # bugs reach production: the tests pass because the owner bypasses the very
+      # policies they claim to verify.
+      - run: pnpm test:integration
+
+      - name: Every down() migration is reversible
+        run: pnpm migrate:down:up

@@ -1,0 +1,40 @@
+{
+  "name": "deepsight",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "DeepSight guard operations platform",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "db:bootstrap": "node packages/db/scripts/bootstrap.mjs",
+    "db:migrate": "node packages/db/scripts/migrate.mjs up",
+    "db:migrate:down": "node packages/db/scripts/migrate.mjs down",
+    "db:seed": "node packages/db/scripts/seed.mjs",
+    "db:lint": "node packages/db/scripts/migration-lint.mjs",
+    "migrate:down:up": "node packages/db/scripts/migrate-down-up.mjs",
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run check:boundaries && pnpm run test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@deepsight/eslint-config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "pg": "^8.13.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

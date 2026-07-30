@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "noEmitOnError": true,
+    "declaration": true,
+    "sourceMap": true,
+
+    // The one deliberate relaxation: exactOptionalPropertyTypes makes many third-party
+    // .d.ts files fail to compile through no fault of ours. Without this our own strict
+    // config becomes unusable, and the pressure becomes to turn *that* off instead.
+    "skipLibCheck": true,
+
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@deepsight/contracts": ["packages/contracts/src/index.ts"],
+      "@deepsight/config-env": ["packages/config-env/src/index.ts"],
+      "@deepsight/observability": ["packages/observability/src/index.ts"],
+      "@deepsight/db": ["packages/db/src/index.ts"],
+      "@deepsight/test-support": ["packages/test-support/src/index.ts"]
+    }
+  }
+}

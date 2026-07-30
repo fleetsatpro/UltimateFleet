@@ -53,9 +53,11 @@ roots in this repository, cleared of its previous contents.
 
 ---
 
-## Phase 1 — Foundation & Tenant-Isolated Data Layer
+## Phase 1 — Foundation & Tenant-Isolated Data Layer ✅ DELIVERED
 
-**Scope: L** · **Depends on:** nothing · **Gated on:** D6 confirmation
+**Scope: L** · **Depends on:** nothing · **Status:** implemented; all 12 acceptance criteria
+pass (35 tests). Built to D6(b); if D6 is rejected, removing the `organizations` level is a
+contained change while nothing else depends on the schema yet.
 
 One sentence: stand up the monorepo, the strict toolchain, and the complete PostgreSQL schema with
 two-level tenant isolation proven by test.
@@ -71,13 +73,18 @@ two-level tenant isolation proven by test.
    - node-pg-migrate migrations (**up + down**) for `organizations` plus all 13 core tables and
      `alarm_closures`
    - three roles: `deepsight_owner`, `deepsight_app`, `deepsight_readonly`; GRANTs
-   - `ENABLE` + **`FORCE` ROW LEVEL SECURITY**, with `USING` + `WITH CHECK` **`AS RESTRICTIVE`**
-     policies on every tenant-scoped table
+   - `ENABLE` + **`FORCE` ROW LEVEL SECURITY** on every tenant-scoped table, with exactly one
+     **`AS PERMISSIVE`** org-isolation policy plus an **`AS RESTRICTIVE`** client-narrowing policy,
+     both carrying `USING` *and* `WITH CHECK`
+   - `app_current_org()` / `app_current_client()` SQL helpers, so no policy casts a raw GUC
    - all indexes from `01-ARCHITECTURE.md` §11.2, including the partial open-alarms index
    - `withOrg()` / `withOrgClient()` / `withGlobalConfig()`; raw pool unexported
    - deterministic seeds: **2 organizations × 2 clients each**, 3 sites, 4 guards, 2 alarm sources,
      mapping rows
-6. `@deepsight/test-support` — Testcontainers harness + cross-tenant assertion helpers.
+6. `@deepsight/test-support` — `TEST_DATABASE_URL`-driven harness + cross-tenant assertion helpers.
+   Driven by connection URLs rather than bound to Testcontainers, so the same harness runs against
+   CI's PostgreSQL service container, a local cluster, or Testcontainers later; binding it to a
+   Docker daemon would make the acceptance suite unrunnable wherever Docker is absent.
 
 ### Acceptance criteria
 
@@ -88,10 +95,10 @@ each of which fails loudly if the corresponding control is absent:
 |---|---|---|
 | A1 | As `deepsight_app` under `withOrg(orgA)`, `SELECT * FROM alarm_events` returns only org A's seeded rows; count matches the seed exactly | Basic RLS read isolation |
 | A2 | Under `withOrg(orgA)`, `INSERT` with `org_id` = orgB **raises** `new row violates row-level security policy` | `WITH CHECK` present — read-only isolation is not enough |
-| A3 | As `deepsight_app` with **no GUC set**, every tenant table returns **0 rows** | Fails closed; a missing GUC never means "all tenants" |
+| A3 | As `deepsight_app` with **no GUC set**, every tenant table returns **0 rows** — including on a *recycled* connection that previously served a tenant query | Fails closed; a missing GUC never means "all tenants". The recycled-connection case is the one that bites: a transaction-local GUC reverts to the **empty string**, not NULL, so a raw `''::uuid` cast raises instead of returning nothing (§7.1) |
 | A4 | As `deepsight_owner` (the table owner) with GUC = orgA, `SELECT` returns only org A's rows | **`FORCE ROW LEVEL SECURITY` is actually applied.** This test fails if `FORCE` was omitted — the single most commonly missed RLS step |
-| A5 | 100 interleaved calls alternating orgA/orgB across a pool of 5 connections: zero cross-org rows, and `current_setting('app.current_org_id', true)` is NULL on a freshly checked-out connection | The GUC is transaction-local and does not leak to the next borrower of a pooled connection (`01-ARCHITECTURE.md` §7.2) |
-| A6 | `withOrgClient(orgA, clientA1)` returns zero rows belonging to clientA2, while `withOrg(orgA)` returns both clients' rows | The narrowing policy is **`AS RESTRICTIVE`**. If policies were left permissive, PostgreSQL `OR`-combines them and narrowing is silently defeated — over-exposure with no error |
+| A5 | 100 interleaved calls alternating orgA/orgB across a pool of 5 connections: zero cross-org rows, and no org id remains readable on a freshly checked-out connection | The GUC is transaction-local and does not leak to the next borrower of a pooled connection (`01-ARCHITECTURE.md` §7.2) |
+| A6 | `withOrgClient(orgA, clientA1)` returns zero rows belonging to clientA2, while `withOrg(orgA)` returns both clients' rows; and every tenant table has **exactly one** permissive policy | The narrowing policy is **`AS RESTRICTIVE`** so it is AND-ed. Leaving it permissive would `OR` it with org isolation and silently defeat it; making *both* restrictive returns zero rows, because an empty permissive set is false (§7.1) |
 | A7 | Same alarm event inserted twice → 1 row; the second insert reports 0 rows affected | `(vendor, vendor_event_id)` dedupe works and is detectable by the caller |
 | A8 | `pnpm run migrate:down:up` — all migrations down, then up, then schema matches a committed snapshot | Every `down()` genuinely reverses |
 | A9 | Two active enrollments for one guard → unique violation; revoking the first, then inserting → succeeds | Partial unique index `(guard_id) WHERE revoked_at IS NULL` enforces single-active-enrollment at DB level |

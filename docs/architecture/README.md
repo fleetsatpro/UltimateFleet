@@ -35,10 +35,18 @@ to reverse.
 6. **Greenfield resolves two open items.** No prior codebase exists, so there is no shared Centrifugo
    instance to reuse (Socket.io chosen outright, not contingently) and R2 is a provisioning task
    rather than a pre-existing asset. → `01` §0.
+7. **Two RLS errors in an earlier draft of this document set, found by building it.** Declaring both
+   policies `AS RESTRICTIVE` returns *zero* rows rather than isolating (PostgreSQL needs ≥1
+   permissive policy); and a transaction-local GUC reverts to the *empty string*, not NULL, so a raw
+   `''::uuid` cast in a policy raises on any recycled pooled connection. Both corrected, both now
+   regression-tested. → `01` §7.1.
 
 ## Status
 
-Three pre-build documents complete. The repository has been cleared of its previous
-fleet-management prototype, so DeepSight roots here with a clean tree.
+Three pre-build documents complete. **Phase 1 is implemented and its full acceptance suite passes**
+(35 tests: 10 unit, 25 integration). Everything in `01` and `02` describing Phase 1 reflects the code
+as built, including the two corrections above.
 
-**Phase 1 implementation is gated on `/continue`**, plus one decision: **D6** (tenancy depth).
+**Phase 2 is gated on `/continue`.** One decision remains outstanding and is worth settling before
+Phase 2 builds on the schema: **D6** (tenancy depth). Phase 1 was built to D6(b), multi-operator,
+which degenerates cleanly to single-operator — see `01` §1.

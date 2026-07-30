@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+node_modules/
+# Architecture documents are hand-wrapped deliverables with tuned tables and Mermaid
+# blocks; reformatting them churns the diff without improving anything.
+docs/

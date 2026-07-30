@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No Node types: React Native imports this package, and a stray Node built-in
+    // breaks the mobile bundler with an error pointing nowhere near the cause.
+    // "DOM" is here only for standard web globals shared by Node 22 and React Native —
+    // AbortSignal in particular, which the adapter contracts require.
+    "types": [],
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -540,28 +540,56 @@ isolation key) alongside `client_id` (a scoping dimension for reports and narrow
 enabled **and forced** on all of them:
 
 ```sql
+-- Helpers, because the empty-string problem below must not be re-derived per table.
+CREATE FUNCTION app_current_org() RETURNS uuid LANGUAGE sql STABLE PARALLEL SAFE
+  AS $$ SELECT NULLIF(current_setting('app.current_org_id', true), '')::uuid $$;
+CREATE FUNCTION app_current_client() RETURNS uuid LANGUAGE sql STABLE PARALLEL SAFE
+  AS $$ SELECT NULLIF(current_setting('app.current_client_id', true), '')::uuid $$;
+
 ALTER TABLE alarm_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alarm_events FORCE  ROW LEVEL SECURITY;   -- removes the table-owner bypass
 
-CREATE POLICY org_isolation ON alarm_events
-  USING      (org_id = current_setting('app.current_org_id', true)::uuid)
-  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);
+-- PERMISSIVE, and the only permissive policy on the table.
+CREATE POLICY org_isolation ON alarm_events AS PERMISSIVE FOR ALL
+  USING      (org_id = app_current_org())
+  WITH CHECK (org_id = app_current_org());
 
--- Optional narrowing for single-client roles (report_viewer). Fail-closed: see §7.2.
-CREATE POLICY client_narrowing ON alarm_events
-  USING (current_setting('app.current_client_id', true) IS NULL
-         OR client_id = current_setting('app.current_client_id', true)::uuid);
+-- RESTRICTIVE, therefore AND-ed on top. Narrows report_viewer sessions to one client.
+CREATE POLICY client_narrowing ON alarm_events AS RESTRICTIVE FOR ALL
+  USING      (app_current_client() IS NULL OR client_id = app_current_client())
+  WITH CHECK (app_current_client() IS NULL OR client_id = app_current_client());
 ```
 
 `WITH CHECK` matters as much as `USING`: without it a tenant can *read* only its own rows but can
 still *insert* a row stamped with another org's `org_id`.
 
-`current_setting(..., true)` returns NULL rather than erroring when the GUC is unset, and
-`org_id = NULL` is NULL — never true. So **a missing GUC yields zero rows, not all rows.** Fail closed.
+**Correction from Phase 1 implementation.** An earlier draft of this section declared *both* policies
+`AS RESTRICTIVE`. That is wrong, and wrong in the worst direction — I verified it experimentally
+before writing the migration. PostgreSQL evaluates access as:
 
-PostgreSQL combines multiple permissive policies with `OR`, which would defeat the narrowing policy —
-so both are declared **`AS RESTRICTIVE`**, making them `AND`-combined. This is easy to get wrong and
-the failure is silent over-exposure, so Phase 1 tests it directly (test A6).
+```
+(OR of PERMISSIVE policies) AND (AND of RESTRICTIVE policies)
+```
+
+An empty permissive set makes that expression **false**, so a table carrying only restrictive
+policies returns **zero rows** — a total blackout, not isolation. The correct shape is exactly one
+permissive policy (`org_isolation`) with the narrowing policy restrictive on top. Being the *sole*
+permissive policy is itself a property worth keeping: there is nothing for `OR` to combine it with,
+so it cannot be weakened by a later addition without that addition being obvious in review. The
+schema guard fails CI on any tenant table that has only restrictive policies.
+
+**Second correction: a transaction-local GUC does not revert to NULL.** `set_config(name, v, true)`
+reverts on `COMMIT`/`ROLLBACK` to the custom GUC's previous value, which for a never-session-set
+custom GUC is the **empty string**, not NULL. So a policy written directly as
+`org_id = current_setting('app.current_org_id', true)::uuid` raises `invalid input syntax for type
+uuid` on any pooled connection that previously served a tenant query — a runtime error instead of an
+empty result, appearing only after connection reuse and therefore only under load. That is what the
+`app_current_org()` / `app_current_client()` helpers exist for: they `NULLIF` the empty string away,
+and routing every policy through them means the fix cannot be forgotten on one table out of fifteen.
+
+With the helpers in place, an unset GUC yields NULL, `org_id = NULL` is NULL, and NULL is never
+true — so **a missing GUC yields zero rows and rejects every write. Fail closed.** Phase 1 tests both
+corrections directly (A3 and A6).
 
 Three roles, with the hard separation the brief demands:
 
