@@ -4,7 +4,12 @@ import { createAllAdapters } from '@deepsight/vendor-adapters';
 import { createCursorStore, type CursorStore } from './ingestion/cursor-store.js';
 import type { DispatchDeps } from './ingestion/dispatcher.js';
 import { createMappingCache, type MappingCache } from './ingestion/mapping-cache.js';
-import { ingestEvents, type FanOut, type IngestResult } from './ingestion/pipeline.js';
+import {
+  ingestEvents,
+  type FanOut,
+  type IngestResult,
+  type MediaSink,
+} from './ingestion/pipeline.js';
 import {
   createVendorHealthSource,
   createVendorRuntime,
@@ -29,6 +34,8 @@ export interface EngineCoreDeps {
   readonly alerts: Alerts;
   /** Overridable so Phase 6 can substitute the Socket.io broadcaster. */
   readonly fanOut?: FanOut | undefined;
+  /** Present only when R2 is configured; absent disables media enqueue (Open Item 10). */
+  readonly media?: MediaSink | undefined;
 }
 
 export interface EngineCore {
@@ -106,6 +113,7 @@ export async function createEngineCore(deps: EngineCoreDeps): Promise<EngineCore
         {
           mappings,
           fanOut,
+          ...(deps.media !== undefined ? { media: deps.media } : {}),
           logger: deps.logger,
           metrics: deps.metrics,
           alerts: deps.alerts,

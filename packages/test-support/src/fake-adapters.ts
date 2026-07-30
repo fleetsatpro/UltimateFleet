@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
   AlarmSeverity,
+  MediaRef,
   NormalizedAlarmEvent,
   NormalizedEventType,
   PollCursor,
@@ -36,6 +37,8 @@ export interface FakeEventOptions {
   readonly occurredAt?: Date | undefined;
   readonly correlationId?: string | undefined;
   readonly internalId?: string | undefined;
+  /** Media references to attach, for exercising the Phase 5 media pipeline. */
+  readonly mediaUrls?: readonly MediaRef[] | undefined;
 }
 
 let internalIdCounter = 0;
@@ -61,7 +64,7 @@ export function makeFakeEvent(options: FakeEventOptions): NormalizedAlarmEvent {
     occurred_at: occurred,
     received_at: new Date(occurred.getTime() + 1_000),
     raw_payload: { fake: true, vendorEventId: options.vendorEventId },
-    media_urls: [],
+    media_urls: options.mediaUrls ?? [],
     correlation_id: options.correlationId ?? 'fake-correlation',
     vendor_event_code: options.vendorEventCode === undefined ? '1001' : options.vendorEventCode,
   };

@@ -6,3 +6,5 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
+# Redis persistence file, written when a local redis-server runs in the working directory.
+dump.rdb

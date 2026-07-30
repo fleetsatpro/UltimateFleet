@@ -1,9 +1,15 @@
 import { closePool, initPool } from '@deepsight/db';
 import { createAlerts, createLogger, createMetrics } from '@deepsight/observability';
 import { createQueueFactory, QUEUE_NAMES } from '@deepsight/queue';
-import { loadEngineEnv } from './env.js';
+import { createR2ObjectStore } from '@deepsight/storage-r2';
+import { loadEngineEnv, resolveR2Config } from './env.js';
 import { createApp } from './http/app.js';
 import { createEngineCore } from './core.js';
+import { createMediaEnqueuer } from './media/enqueue.js';
+import { createMediaFetchHandler } from './media/worker.js';
+import type { MediaFetchJob } from './media/job.js';
+import type { MediaSink } from './ingestion/pipeline.js';
+import type { TypedWorker } from '@deepsight/queue';
 
 /**
  * Service entrypoint.
@@ -41,7 +47,36 @@ async function main(): Promise<void> {
     alerts,
   });
 
-  const core = await createEngineCore({ logger, metrics, alerts });
+  /**
+   * The media pipeline is wired only when R2 is configured. R2 is not provisioned yet
+   * (Open Item 10), so its absence is a supported runtime state — the engine ingests and
+   * fans out as normal, just without fetching media — rather than a boot failure. A partial
+   * R2 config was already rejected at env-parse time.
+   */
+  const r2Config = resolveR2Config(env);
+  let mediaSink: MediaSink | undefined;
+  let mediaWorker: TypedWorker | undefined;
+  if (r2Config !== null) {
+    const objectStore = createR2ObjectStore(r2Config);
+    const mediaQueue = queues.queue<MediaFetchJob>(QUEUE_NAMES.mediaFetch);
+    mediaSink = createMediaEnqueuer({ queue: mediaQueue, logger, metrics, alerts });
+    const handleMedia = createMediaFetchHandler({ objectStore, logger, metrics, alerts });
+    mediaWorker = queues.worker<MediaFetchJob>(
+      QUEUE_NAMES.mediaFetch,
+      (payload) => handleMedia(payload),
+      { concurrency: 4 },
+    );
+    logger.info({ bucket: r2Config.bucket }, 'media pipeline enabled');
+  } else {
+    logger.warn({}, 'media pipeline disabled: R2 not configured (Open Item 10)');
+  }
+
+  const core = await createEngineCore({
+    logger,
+    metrics,
+    alerts,
+    ...(mediaSink !== undefined ? { media: mediaSink } : {}),
+  });
 
   /**
    * The alarm.ingest consumer. The AxxonSoft worker publishes here rather than calling
@@ -101,6 +136,7 @@ async function main(): Promise<void> {
     server.close();
     core.dispose();
     await alarmWorker.close();
+    if (mediaWorker !== undefined) await mediaWorker.close();
     await queues.close();
     await closePool();
     process.exit(0);

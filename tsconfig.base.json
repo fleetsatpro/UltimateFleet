@@ -33,7 +33,8 @@
       "@deepsight/test-support": ["packages/test-support/src/index.ts"],
       "@deepsight/queue": ["packages/queue/src/index.ts"],
       "@deepsight/resilience": ["packages/resilience/src/index.ts"],
-      "@deepsight/vendor-adapters": ["packages/vendor-adapters/src/index.ts"]
+      "@deepsight/vendor-adapters": ["packages/vendor-adapters/src/index.ts"],
+      "@deepsight/storage-r2": ["packages/storage-r2/src/index.ts"]
     }
   }
 }

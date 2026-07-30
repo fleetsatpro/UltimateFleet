@@ -75,4 +75,46 @@ export const databaseEnvSchema = z.object({
 
 export type DatabaseEnv = z.infer<typeof databaseEnvSchema>;
 
+/**
+ * Cloudflare R2 configuration for the media pipeline.
+ *
+ * Every credential field is OPTIONAL because R2 is not provisioned yet (Open Item 10): a
+ * service must still boot without it, just with the media pipeline disabled. But a PARTIAL
+ * config — an endpoint with no secret, say — is a misconfiguration, not "disabled", so the
+ * superRefine rejects it: either all four connection fields are present or none are. The TTL
+ * and region carry safe defaults; the connection fields never do.
+ */
+const R2_CONNECTION_FIELDS = [
+  'R2_ENDPOINT',
+  'R2_BUCKET',
+  'R2_ACCESS_KEY_ID',
+  'R2_SECRET_ACCESS_KEY',
+] as const;
+
+export const r2EnvSchema = z
+  .object({
+    R2_ENDPOINT: z.string().url().optional(),
+    R2_BUCKET: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_REGION: z.string().min(1).default('auto'),
+    MEDIA_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+  })
+  .superRefine((value, ctx) => {
+    const present = R2_CONNECTION_FIELDS.filter(
+      (field) => value[field] !== undefined && value[field] !== '',
+    );
+    if (present.length !== 0 && present.length !== R2_CONNECTION_FIELDS.length) {
+      const missing = R2_CONNECTION_FIELDS.filter((field) => !present.includes(field));
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          `R2 is partially configured: set all of ${R2_CONNECTION_FIELDS.join(', ')} to enable ` +
+          `the media pipeline, or none to disable it. Missing: ${missing.join(', ')}.`,
+      });
+    }
+  });
+
+export type R2Env = z.infer<typeof r2EnvSchema>;
+
 export { z };

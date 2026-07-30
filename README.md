@@ -7,7 +7,7 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-4 complete.** 112 tests passing across unit and integration suites (the latter against
+**Phases 1-5 complete.** 128 tests passing across unit and integration suites (the latter against
 real PostgreSQL and Redis).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
@@ -24,6 +24,11 @@ real PostgreSQL and Redis).
   decorrelated jitter from the first failure, and publishes signed jobs to the engine over BullMQ.
   This phase surfaced divergence D7 — the ingestion schema must coerce dates because BullMQ delivers
   them as JSON strings — caught by a full worker→Redis→engine test.
+- **Phase 5** — the media pipeline: an `ObjectStore` port with a Cloudflare R2 binding (streaming
+  multipart upload, signed URLs) and a local HTTP binding for tests; a `media.fetch` worker that
+  streams expiring vendor URLs straight into storage with a flat memory profile, records the outcome
+  on `incident_media` (the key, never the bytes), and orders fetches by expiry. R2 is unprovisioned
+  (Open Item 10), so the engine runs media-disabled until the `R2_*` vars are set.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
@@ -72,11 +77,12 @@ packages/
 ├── queue/           BullMQ factories with signature verification inside the worker factory
 ├── resilience/      per-vendor Cockatiel policy (retry/breaker/timeout/bulkhead) + breaker sweep
 ├── vendor-adapters/ GuardTek / Dahua / Axxon, contract-first (unverified ops throw)
-├── test-support/    integration harness, fake adapters, cross-tenant assertion helpers
+├── storage-r2/      ObjectStore port + Cloudflare R2 binding (streaming upload, signed URLs)
+├── test-support/    integration harness, fake adapters, local ObjectStore, assertion helpers
 └── eslint-config/   shared lint config incl. the Promise.all ban and no-silent-catch rule
 
 apps/
-├── integration-engine/  ingestion pipeline, mapping cache, HTTP surface, queue consumer
+├── integration-engine/  ingestion pipeline, mapping cache, media pipeline, HTTP surface, consumers
 └── axxon-worker/        isolated stream worker: reconnecting consumer, signed publish, no DB
 ```
 

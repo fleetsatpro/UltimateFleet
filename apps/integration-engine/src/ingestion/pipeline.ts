@@ -3,7 +3,7 @@ import {
   type NormalizedAlarmEvent,
   type VendorId,
 } from '@deepsight/contracts';
-import { insertAlarmEvent, withOrg } from '@deepsight/db';
+import { insertAlarmEvent, insertPendingMedia, withOrg } from '@deepsight/db';
 import {
   extendCorrelation,
   type Alerts,
@@ -26,6 +26,32 @@ export interface FanOut {
   publish(event: NormalizedAlarmEvent): Promise<void>;
 }
 
+/** A media row persisted alongside its alarm event, ready to be fetched into R2. */
+export interface PersistedMediaRow {
+  readonly id: string;
+  readonly source_url: string;
+  readonly kind: string;
+  readonly expires_at: Date | null;
+}
+
+export interface MediaEnqueueInput {
+  readonly orgId: string;
+  readonly clientId: string;
+  readonly alarmEventId: string;
+  readonly correlationId: string;
+  readonly rows: readonly PersistedMediaRow[];
+}
+
+/**
+ * Where an event's media goes to be fetched. Injected rather than called directly so the
+ * pipeline never imports the queue: ingestion depends on the ABILITY to enqueue media, not on
+ * BullMQ. Enqueuing happens after the DB commit and outside its transaction, so a Redis hiccup
+ * cannot roll back a persisted alarm event.
+ */
+export interface MediaSink {
+  enqueue(input: MediaEnqueueInput): Promise<void>;
+}
+
 export interface PipelineDeps {
   readonly mappings: {
     resolve(
@@ -38,6 +64,8 @@ export interface PipelineDeps {
     };
   };
   readonly fanOut: FanOut;
+  /** Optional: absent when R2 is not configured, so the engine runs without a media pipeline. */
+  readonly media?: MediaSink | undefined;
   readonly logger: Logger;
   readonly metrics: Metrics;
   readonly alerts: Alerts;
@@ -136,7 +164,28 @@ export async function ingestEvents(
         vendor: normalized.vendor,
       },
       async () => {
-        const result = await withOrg(normalized.org_id, (tx) => insertAlarmEvent(tx, normalized));
+        // The alarm event and its pending media rows go in ONE transaction: the incident_media
+        // FK requires the event to exist, and an alarm with no media rows (or media rows with no
+        // alarm) is never a state anyone should observe. A duplicate returns inserted=false and
+        // writes nothing further, so redelivery cannot spawn duplicate media rows either.
+        const result = await withOrg(normalized.org_id, async (tx) => {
+          const insert = await insertAlarmEvent(tx, normalized);
+          if (!insert.inserted) return { inserted: false as const };
+          const rows =
+            deps.media !== undefined && normalized.media_urls.length > 0
+              ? await insertPendingMedia(tx, {
+                  orgId: normalized.org_id,
+                  clientId: normalized.client_id,
+                  alarmEventId: insert.internalId,
+                  refs: normalized.media_urls.map((m) => ({
+                    source_url: m.url,
+                    kind: m.kind,
+                    expires_at: m.expires_at ?? null,
+                  })),
+                })
+              : [];
+          return { inserted: true as const, alarmEventId: insert.internalId, rows };
+        });
 
         if (result.inserted) {
           persisted += 1;
@@ -148,6 +197,19 @@ export async function ingestEvents(
           // Only now — the gate that makes redelivery harmless downstream.
           await deps.fanOut.publish(normalized);
           deps.logger.debug({ internalId: normalized.internal_id }, 'alarm event fanned out');
+
+          // Enqueue media AFTER the commit, outside the DB transaction: a queue failure must
+          // not roll back a persisted event, and the rows are already durably 'pending' so a
+          // lost enqueue is recoverable from the DB, not silently dropped.
+          if (deps.media !== undefined && result.rows.length > 0) {
+            await deps.media.enqueue({
+              orgId: normalized.org_id,
+              clientId: normalized.client_id,
+              alarmEventId: result.alarmEventId,
+              correlationId: normalized.correlation_id,
+              rows: result.rows,
+            });
+          }
         } else {
           duplicates += 1;
           deps.metrics.counter('ingest_duplicate_suppressed_total', 1, {

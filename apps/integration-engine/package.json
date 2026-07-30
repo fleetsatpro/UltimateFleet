@@ -16,6 +16,7 @@
     "@deepsight/observability": "workspace:*",
     "@deepsight/queue": "workspace:*",
     "@deepsight/resilience": "workspace:*",
+    "@deepsight/storage-r2": "workspace:*",
     "@deepsight/vendor-adapters": "workspace:*",
     "express": "^4.21.2",
     "uuidv7": "^1.0.2",

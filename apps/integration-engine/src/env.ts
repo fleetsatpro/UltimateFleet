@@ -1,4 +1,4 @@
-import { databaseEnvSchema, parseEnv, requiredString, z } from '@deepsight/config-env';
+import { databaseEnvSchema, parseEnv, r2EnvSchema, requiredString, z } from '@deepsight/config-env';
 
 /**
  * The engine's full environment contract, validated once at startup. Missing required
@@ -8,7 +8,7 @@ import { databaseEnvSchema, parseEnv, requiredString, z } from '@deepsight/confi
  * owner credential is supplied only to the migration pre-deploy step, so it is not
  * present in this process and the application cannot use it even by mistake.
  */
-export const engineEnvSchema = databaseEnvSchema.extend({
+const engineBaseSchema = databaseEnvSchema.extend({
   REDIS_URL: requiredString(),
   PORT: z.coerce.number().int().positive().default(8080),
   /**
@@ -31,8 +31,45 @@ export const engineEnvSchema = databaseEnvSchema.extend({
   LOG_LEVEL: z.string().default('info'),
 });
 
+/**
+ * The engine's env is the base service contract intersected with the optional R2 block, so
+ * the media pipeline's config (which may be entirely absent — Open Item 10) validates by the
+ * same rules as everything else, including its all-or-nothing partial-config check.
+ */
+export const engineEnvSchema = engineBaseSchema.and(r2EnvSchema);
+
 export type EngineEnv = z.infer<typeof engineEnvSchema>;
 
 export function loadEngineEnv(source?: Record<string, string | undefined>): EngineEnv {
   return parseEnv('integration-engine', engineEnvSchema, source);
+}
+
+/**
+ * Resolves the R2 object-store config from the environment, or null when R2 is not configured
+ * — in which case the engine boots with the media pipeline disabled rather than failing. The
+ * partial-config case is already rejected at parse time, so reaching here with some-but-not-all
+ * fields is impossible; a single field check is enough to distinguish "on" from "off".
+ */
+export function resolveR2Config(env: EngineEnv): {
+  readonly endpoint: string;
+  readonly region: string;
+  readonly bucket: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+} | null {
+  if (
+    env.R2_ENDPOINT === undefined ||
+    env.R2_BUCKET === undefined ||
+    env.R2_ACCESS_KEY_ID === undefined ||
+    env.R2_SECRET_ACCESS_KEY === undefined
+  ) {
+    return null;
+  }
+  return {
+    endpoint: env.R2_ENDPOINT,
+    region: env.R2_REGION,
+    bucket: env.R2_BUCKET,
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+  };
 }

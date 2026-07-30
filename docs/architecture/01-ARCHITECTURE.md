@@ -1024,7 +1024,7 @@ the original register are now **resolved** by DeepSight being greenfield.
 | 7 | ~~Shared Centrifugo instance availability~~ | **Resolved** — greenfield, none exists; Socket.io chosen outright | Nothing | — |
 | 8 | Observability backend | **Resolved for MVP** — Railway log drain; OpenTelemetry as the upgrade path once a backend is chosen | Nothing | Griff |
 | 9 | **DNS/domain plan.** Same-site API subdomain needed for `SameSite=Lax` session cookies (§9.2); else `SameSite=None` + CSRF tokens | Unresolved | Phase 7 | Griff |
-| 10 | R2 bucket provisioning + credentials (a setup task, not a pre-existing asset) | Unresolved | Phase 5 | Griff |
+| 10 | R2 bucket provisioning + credentials (a setup task, not a pre-existing asset) | Pipeline delivered (Phase 5); bucket still to provision — engine runs media-disabled until the four `R2_*` vars are set | Phase 5 | Griff |
 | 11 | Face-match similarity threshold per site/client | Unresolved | Phase 9 | Operator (risk decision) |
 | 12 | Max acceptable offline window for a revoked guard (§9.1) | Unresolved | Phase 8 sync policy | Operator (security policy) |
 | 13 | Transactional email provider + verified sending domain | Unresolved | Phase 11 | Griff |
