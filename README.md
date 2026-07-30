@@ -7,7 +7,7 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-5 complete.** 128 tests passing across unit and integration suites (the latter against
+**Phases 1-6 complete.** 138 tests passing across unit and integration suites (the latter against
 real PostgreSQL and Redis).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
@@ -29,6 +29,11 @@ real PostgreSQL and Redis).
   streams expiring vendor URLs straight into storage with a flat memory profile, records the outcome
   on `incident_media` (the key, never the bytes), and orders fetches by expiry. R2 is unprovisioned
   (Open Item 10), so the engine runs media-disabled until the `R2_*` vars are set.
+- **Phase 6** — the realtime transport: a Socket.io hub with the Redis adapter (rooms span engine
+  instances), connect-time authentication via a minimal HMAC dashboard session, per-org room
+  isolation, revocation enforced by a heartbeat sweep, a socket fan-out replacing the Phase 2 log
+  sink, and a vendor-health broadcaster. Boot-optional (headless without `DASHBOARD_SESSION_SECRET`);
+  the browser dashboard UI is on the frontend track.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).

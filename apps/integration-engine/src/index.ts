@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { closePool, initPool } from '@deepsight/db';
 import { createAlerts, createLogger, createMetrics } from '@deepsight/observability';
 import { createQueueFactory, QUEUE_NAMES } from '@deepsight/queue';
@@ -8,8 +9,11 @@ import { createEngineCore } from './core.js';
 import { createMediaEnqueuer } from './media/enqueue.js';
 import { createMediaFetchHandler } from './media/worker.js';
 import type { MediaFetchJob } from './media/job.js';
-import type { MediaSink } from './ingestion/pipeline.js';
+import type { FanOut, MediaSink } from './ingestion/pipeline.js';
 import type { TypedWorker } from '@deepsight/queue';
+import { createSessionCodec, createSessionRegistry } from './realtime/session.js';
+import { createRealtimeHub, type RealtimeHub } from './realtime/hub.js';
+import { startVendorHealthBroadcast, type VendorHealthBroadcaster } from './realtime/fanout.js';
 
 /**
  * Service entrypoint.
@@ -71,10 +75,24 @@ async function main(): Promise<void> {
     logger.warn({}, 'media pipeline disabled: R2 not configured (Open Item 10)');
   }
 
+  // A deferred fan-out breaks the wiring cycle: the core needs a fan-out, the realtime hub
+  // needs the HTTP server, the server needs the app, and the app needs the core. The core is
+  // built with a closure that forwards to the hub once it exists (and logs until then / when
+  // realtime is disabled). publish() only runs per persisted event at runtime, long after wiring.
+  let hub: RealtimeHub | null = null;
+  const fanOut: FanOut = {
+    publish(event) {
+      if (hub !== null) hub.broadcastAlarm(event);
+      else logger.debug({ internalId: event.internal_id }, 'alarm event (no dashboard attached)');
+      return Promise.resolve();
+    },
+  };
+
   const core = await createEngineCore({
     logger,
     metrics,
     alerts,
+    fanOut,
     ...(mediaSink !== undefined ? { media: mediaSink } : {}),
   });
 
@@ -101,7 +119,32 @@ async function main(): Promise<void> {
     ...(env.ADMIN_API_TOKEN !== undefined ? { adminToken: env.ADMIN_API_TOKEN } : {}),
   });
 
-  const server = app.listen(env.PORT, env.BIND_HOST, () => {
+  // Explicit http.Server (rather than app.listen) so the realtime hub can attach to it.
+  const server = createServer(app);
+
+  /**
+   * The realtime hub is started only when a dashboard session secret is configured — otherwise
+   * the engine runs headless. When on, it binds the deferred fan-out above to the socket layer
+   * and starts pushing vendor health to dashboards.
+   */
+  let healthBroadcast: VendorHealthBroadcaster | null = null;
+  if (env.DASHBOARD_SESSION_SECRET !== undefined) {
+    hub = createRealtimeHub({
+      httpServer: server,
+      redisUrl: env.REDIS_URL,
+      codec: createSessionCodec(env.DASHBOARD_SESSION_SECRET),
+      registry: createSessionRegistry(),
+      logger,
+      metrics,
+      ...(env.DASHBOARD_ORIGIN !== undefined ? { corsOrigin: env.DASHBOARD_ORIGIN } : {}),
+    });
+    healthBroadcast = startVendorHealthBroadcast({ hub, source: core.vendorHealth, logger });
+    logger.info({}, 'realtime dashboard hub enabled');
+  } else {
+    logger.warn({}, 'realtime dashboard disabled: DASHBOARD_SESSION_SECRET not set');
+  }
+
+  server.listen(env.PORT, env.BIND_HOST, () => {
     logger.info(
       { port: env.PORT, host: env.BIND_HOST, mappings: core.mappings.size() },
       'integration engine listening',
@@ -133,10 +176,14 @@ async function main(): Promise<void> {
     shuttingDown = true;
 
     logger.info({ signal }, 'shutting down');
-    server.close();
+    healthBroadcast?.close();
     core.dispose();
     await alarmWorker.close();
     if (mediaWorker !== undefined) await mediaWorker.close();
+    // The hub owns the socket server and, through it, the HTTP server; close it so both go
+    // down cleanly. With no hub, close the HTTP server directly.
+    if (hub !== null) await hub.close();
+    else server.close();
     await queues.close();
     await closePool();
     process.exit(0);

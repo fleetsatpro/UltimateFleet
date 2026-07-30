@@ -28,6 +28,14 @@ const engineBaseSchema = databaseEnvSchema.extend({
    * silently open an admin surface.
    */
   ADMIN_API_TOKEN: z.string().min(16).optional(),
+  /**
+   * Signing secret for dashboard session tokens (Phase 6 realtime). Optional: absent means the
+   * realtime hub is not started and the engine runs headless (ingest + fan-out to logs only),
+   * the same fail-safe posture R2 uses. Phase 7 replaces this minimal session with full RBAC.
+   */
+  DASHBOARD_SESSION_SECRET: z.string().min(16).optional(),
+  /** Allowed browser origin for dashboard sockets; absent reflects the request origin. */
+  DASHBOARD_ORIGIN: z.string().optional(),
   LOG_LEVEL: z.string().default('info'),
 });
 
