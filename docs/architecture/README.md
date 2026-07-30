@@ -1,32 +1,43 @@
-# Sonalit Guard Operations Platform — Pre-Build Document Set
+# DeepSight — Pre-Build Document Set
 
-Deliverables produced before any implementation code, per the build brief's §7/§8 gate.
+Guard operations platform. Deliverables produced before any implementation code, per the build
+brief's §7/§8 gate.
 
 | Doc | Contents |
 |---|---|
-| [`01-ARCHITECTURE.md`](./01-ARCHITECTURE.md) | Repository context finding, divergences from the brief, C4 Context + Container diagrams, alarm-ingestion data flow, technology decisions, refined TypeScript contracts, multi-tenancy/RLS design, resiliency, auth & authz, biometric architecture, data model & indexing rationale, open items |
+| [`01-ARCHITECTURE.md`](./01-ARCHITECTURE.md) | Build context, divergences from the brief, C4 Context + Container diagrams, alarm-ingestion data flow, technology decisions, refined TypeScript contracts, multi-tenancy/RLS design, resiliency, auth & authz, biometric architecture, data model & indexing rationale, open items |
 | [`02-REPOSITORY-STRUCTURE.md`](./02-REPOSITORY-STRUCTURE.md) | pnpm workspace layout, package responsibilities, dependency graph, CI/CD, standards enforcement |
 | [`03-PHASED-BUILD-PLAN.md`](./03-PHASED-BUILD-PLAN.md) | 12 phases + a parallel compliance track, with inter-phase dependencies and runnable acceptance criteria per phase |
 
 ## Read these first
 
-Five findings change the work relative to the brief as written:
+Six findings change the work relative to the brief as written. The first is the one that is expensive
+to reverse.
 
-1. **This repository is not the Sonalit codebase.** It holds an unrelated vehicle-fleet-management
-   prototype. Several brief instructions reference existing Sonalit infrastructure (Centrifugo,
-   `withOrg()`, provisioned R2) that does not exist here. → `01` §0, Open Item 0.
+1. **Tenancy has two levels, not one.** The brief's schema makes `client_id` the RLS key, which fits
+   one guarding company's internal system. DeepSight is a product, so the design uses
+   `organizations → clients → sites` with `org_id` as the isolation key — a single-operator
+   deployment is just the degenerate case. Retrofitting a tenancy level onto live multi-tenant RLS
+   holding biometric data is brutal; removing one now is a document edit. It also determines who the
+   data controller is, and therefore the entire shape of the compliance work.
+   → `01` §1 (D6). **Confirm or reject before Phase 1.**
 2. **The brief's Cockatiel snippet does not compile.** It is Polly (.NET) fluent syntax; Cockatiel
-   uses standalone policy functions. Corrected version in `01` §8.1. → Divergence D1.
-3. **Kenya DPA compliance is a ≥60-day statutory lead time, not a checkbox.** DPIAs must be filed
-   with the Data Commissioner at least 60 days before processing begins, and biometric data is
-   expressly sensitive personal data. The compliance track therefore starts in parallel with
+   uses standalone policy functions. Corrected in `01` §8.1. Decorrelated jitter is already the
+   default backoff generator, so the brief's jitter call was redundant as well as invalid. → D1.
+3. **Data-protection compliance is a ≥60-day statutory lead time, not a checkbox.** DPIAs must be
+   filed with the supervisory authority at least 60 days before processing begins, and biometric data
+   is expressly sensitive personal data. The compliance track therefore starts in parallel with
    Phase 1, not when biometrics start. → `01` §10.1, `03` Track C.
 4. **Drizzle Kit cannot satisfy the brief's own migration requirement** — it generates no `down`
-   migrations. node-pg-migrate chosen. → Divergence D2.
+   migrations. node-pg-migrate chosen instead. → D2.
 5. **Webhook signature verification needs raw bytes**, which the draft adapter interface made
-   impossible. → Divergence D3/D4, `01` §6.3.
+   impossible by passing parsed JSON. → D4, `01` §6.3.
+6. **Greenfield resolves two open items.** No prior codebase exists, so there is no shared Centrifugo
+   instance to reuse (Socket.io chosen outright, not contingently) and R2 is a provisioning task
+   rather than a pre-existing asset. → `01` §0.
 
 ## Status
 
-Three pre-build documents complete. **Phase 1 implementation is gated on `/continue`** and on a
-decision on Open Item 0 (repository placement).
+Three pre-build documents complete. **Phase 1 implementation is gated on `/continue`**, plus two
+decisions: **D6** (tenancy depth) and **Open Item 0** (repository placement — recommend a new
+`fleetsatpro/deepsight` repo).
