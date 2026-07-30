@@ -31,7 +31,9 @@
       "@deepsight/observability": ["packages/observability/src/index.ts"],
       "@deepsight/db": ["packages/db/src/index.ts"],
       "@deepsight/test-support": ["packages/test-support/src/index.ts"],
-      "@deepsight/queue": ["packages/queue/src/index.ts"]
+      "@deepsight/queue": ["packages/queue/src/index.ts"],
+      "@deepsight/resilience": ["packages/resilience/src/index.ts"],
+      "@deepsight/vendor-adapters": ["packages/vendor-adapters/src/index.ts"]
     }
   }
 }

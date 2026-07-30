@@ -1,8 +1,18 @@
 import type { NormalizedAlarmEvent } from '@deepsight/contracts';
 import type { Alerts, Logger, Metrics } from '@deepsight/observability';
+import { createAllAdapters } from '@deepsight/vendor-adapters';
 import { createCursorStore, type CursorStore } from './ingestion/cursor-store.js';
+import type { DispatchDeps } from './ingestion/dispatcher.js';
 import { createMappingCache, type MappingCache } from './ingestion/mapping-cache.js';
 import { ingestEvents, type FanOut, type IngestResult } from './ingestion/pipeline.js';
+import {
+  createVendorHealthSource,
+  createVendorRuntime,
+  webhookAdapterMap,
+  type VendorRuntime,
+} from './ingestion/vendor-runtime.js';
+import type { VendorHealthSource } from './http/app.js';
+import { createWebhookHandler, type WebhookHandler } from './http/webhook.js';
 
 /**
  * The engine's wired core: mapping cache, fan-out target, cursor store and the ingestion
@@ -25,7 +35,13 @@ export interface EngineCore {
   readonly mappings: MappingCache;
   readonly cursors: CursorStore;
   readonly fanOut: FanOut;
+  readonly runtimes: readonly VendorRuntime[];
+  readonly vendorHealth: VendorHealthSource;
+  readonly webhooks: WebhookHandler;
+  /** DispatchDeps for driving webhooks and polls — pipeline deps plus cursors. */
+  readonly dispatch: DispatchDeps;
   ingest(events: readonly unknown[]): Promise<IngestResult>;
+  dispose(): void;
 }
 
 /**
@@ -55,10 +71,36 @@ export async function createEngineCore(deps: EngineCoreDeps): Promise<EngineCore
   const cursors = createCursorStore();
   const fanOut = deps.fanOut ?? createLoggingFanOut(deps.logger);
 
+  // One runtime per registered vendor: the adapter paired with its resilience policy. The
+  // registry is the only place that knows the concrete adapter classes (registry.ts), so
+  // adding a vendor never reaches into the engine.
+  const runtimes = createAllAdapters().map((adapter) => createVendorRuntime(adapter, deps));
+
+  const dispatch: DispatchDeps = {
+    mappings,
+    fanOut,
+    cursors,
+    logger: deps.logger,
+    metrics: deps.metrics,
+    alerts: deps.alerts,
+  };
+
+  const webhooks = createWebhookHandler({
+    adapters: webhookAdapterMap(runtimes),
+    dispatch,
+    logger: deps.logger,
+    metrics: deps.metrics,
+    alerts: deps.alerts,
+  });
+
   return {
     mappings,
     cursors,
     fanOut,
+    runtimes,
+    vendorHealth: createVendorHealthSource(runtimes),
+    webhooks,
+    dispatch,
     async ingest(events) {
       return ingestEvents(
         {
@@ -70,6 +112,9 @@ export async function createEngineCore(deps: EngineCoreDeps): Promise<EngineCore
         },
         events,
       );
+    },
+    dispose() {
+      for (const runtime of runtimes) runtime.dispose();
     },
   };
 }

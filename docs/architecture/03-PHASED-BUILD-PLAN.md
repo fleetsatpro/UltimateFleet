@@ -150,9 +150,12 @@ correlation IDs threaded end to end.
 
 ---
 
-## Phase 3 — Vendor Adapter Layer (contract-first)
+## Phase 3 — Vendor Adapter Layer (contract-first) ✅ DELIVERED
 
-**Scope: M** · **Depends on:** Phase 2 · **Constrained by:** Open Items 1–3
+**Scope: M** · **Depends on:** Phase 2 · **Status:** implemented; all 6 acceptance criteria
+pass (97 tests total across Phases 1–3). Vendor bodies remain withheld behind
+`UNVERIFIED_VENDOR_CONTRACT` pending open items 1–3; the surrounding structure — registry,
+dispatch, resilience policy, webhook route, per-vendor health — is complete and tested.
 
 All three adapters as typed classes implementing the real interfaces, with unverified operations
 throwing `UNVERIFIED_VENDOR_CONTRACT`.

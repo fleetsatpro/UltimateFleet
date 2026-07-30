@@ -7,14 +7,18 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-2 complete.** 59 tests passing (12 unit, 47 integration against real PostgreSQL and
-Redis). Phase 3 (vendor adapters) not started.
+**Phases 1-3 complete.** 97 tests passing (34 unit, 63 integration against real PostgreSQL and
+Redis). Phase 4 (isolated AxxonSoft worker) not started.
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
   three database roles, seeds, schema guards.
 - **Phase 2** — ingestion core and observability spine: the integration engine, an ingestion
   pipeline whose fan-out is gated on actual insertion, a hot-reloadable vendor-code mapping table,
   signed BullMQ job envelopes, and correlation IDs threaded end to end.
+- **Phase 3** — vendor adapter layer, contract-first: GuardTek (poll), Dahua (webhook), Axxon
+  (stream) typed against the real interfaces with unverified operations throwing
+  `UNVERIFIED_VENDOR_CONTRACT`; a corrected Cockatiel resilience policy with a circuit breaker per
+  vendor; a raw-bytes webhook route; and per-vendor health on `/health`.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
@@ -61,6 +65,8 @@ packages/
 ├── config-env/      zod env validation, fails hard naming the missing variable
 ├── observability/   pino JSON logging, AsyncLocalStorage correlation context, metrics
 ├── queue/           BullMQ factories with signature verification inside the worker factory
+├── resilience/      per-vendor Cockatiel policy (retry/breaker/timeout/bulkhead) + breaker sweep
+├── vendor-adapters/ GuardTek / Dahua / Axxon, contract-first (unverified ops throw)
 ├── test-support/    integration harness, fake adapters, cross-tenant assertion helpers
 └── eslint-config/   shared lint config incl. the Promise.all ban and no-silent-catch rule
 
@@ -70,6 +76,8 @@ apps/
 
 Still to come: the AxxonSoft worker (Phase 4), report worker (Phase 10), ops dashboard (Phase 6)
 and guard mobile app (Phase 8).
+
+Vendor contract status is tracked in [`packages/vendor-adapters/VENDOR_TODO.md`](./packages/vendor-adapters/VENDOR_TODO.md).
 
 ## Stack
 

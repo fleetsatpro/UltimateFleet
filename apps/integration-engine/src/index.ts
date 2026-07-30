@@ -61,6 +61,8 @@ async function main(): Promise<void> {
     alerts,
     mappings: core.mappings,
     startedAt,
+    webhooks: core.webhooks,
+    vendorHealth: core.vendorHealth,
     ...(env.ADMIN_API_TOKEN !== undefined ? { adminToken: env.ADMIN_API_TOKEN } : {}),
   });
 
@@ -97,6 +99,7 @@ async function main(): Promise<void> {
 
     logger.info({ signal }, 'shutting down');
     server.close();
+    core.dispose();
     await alarmWorker.close();
     await queues.close();
     await closePool();

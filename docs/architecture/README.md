@@ -43,10 +43,17 @@ to reverse.
 
 ## Status
 
-Three pre-build documents complete. **Phases 1 and 2 are implemented and their full acceptance
-suites pass** (59 tests: 12 unit, 47 integration against real PostgreSQL and Redis). Everything in
-`01` and `02` describing those phases reflects the code as built, including the corrections above.
+Three pre-build documents complete. **Phases 1–3 are implemented and their full acceptance suites
+pass** (97 tests: 34 unit, 63 integration against real PostgreSQL and Redis). Everything in `01` and
+`02` describing those phases reflects the code as built, including the corrections above.
 
-**Phase 3 is gated on `/continue`.** One decision remains outstanding: **D6** (tenancy depth).
-Phases 1-2 were built to D6(b), multi-operator, which degenerates cleanly to single-operator — see
+Phase 3 note: the three vendor adapters are built contract-first — typed against the real interfaces,
+with every vendor-facing operation throwing `UNVERIFIED_VENDOR_CONTRACT` until the WSDL / signature
+scheme / stream endpoint is confirmed (open items 1–3, tracked in
+`packages/vendor-adapters/VENDOR_TODO.md`). The registry, resilience policy (corrected Cockatiel —
+`maxAttempts` counts retries, so the API exposes `totalAttempts`), webhook route (`express.raw`,
+divergence D4), and per-vendor `/health` are complete and tested.
+
+**Phase 4 is gated on `/continue`.** One decision remains outstanding: **D6** (tenancy depth).
+Phases 1–3 were built to D6(b), multi-operator, which degenerates cleanly to single-operator — see
 `01` §1. It gets more expensive to reverse with each phase that builds on the schema.

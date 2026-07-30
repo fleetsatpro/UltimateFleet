@@ -8,6 +8,19 @@ import {
   type Metrics,
 } from '@deepsight/observability';
 import type { MappingCache } from '../ingestion/mapping-cache.js';
+import type { WebhookHandler } from './webhook.js';
+
+/** Per-vendor status the dashboard reads from /health. Populated from adapter health. */
+export interface VendorHealth {
+  readonly vendor: string;
+  readonly status: 'connected' | 'degraded' | 'offline';
+  readonly breaker_state: 'closed' | 'open' | 'half-open';
+  readonly error?: string | undefined;
+}
+
+export interface VendorHealthSource {
+  snapshot(): Promise<readonly VendorHealth[]>;
+}
 
 /**
  * The HTTP surface, built as a factory so tests can exercise it without binding a port.
@@ -29,6 +42,10 @@ export interface AppDeps {
    * sessions and RBAC. Absent means the routes refuse to serve at all — see requireAdmin.
    */
   readonly adminToken?: string | undefined;
+  /** Inbound vendor webhooks (Dahua today). Absent -> the webhook route is not mounted. */
+  readonly webhooks?: WebhookHandler | undefined;
+  /** Per-vendor adapter health for /health. Absent -> vendors reported as []. */
+  readonly vendorHealth?: VendorHealthSource | undefined;
 }
 
 const CORRELATION_HEADER = 'x-correlation-id';
@@ -108,9 +125,21 @@ export function createApp(deps: AppDeps): Express {
     });
   });
 
-  app.get('/health', (_req: Request, res: Response) => {
-    // Vendor adapter health and per-vendor circuit breaker state join this payload in
-    // Phase 3; the shape is stable so the dashboard can consume it from Phase 6.
+  app.get('/health', async (_req: Request, res: Response) => {
+    // Per-vendor status and circuit-breaker state is what the dashboard uses to show a
+    // vendor as connected / degraded / offline (brief section 6). Failing to gather it must
+    // not fail the health check itself — a broken vendor is not a broken engine.
+    let vendors: readonly VendorHealth[] = [];
+    try {
+      vendors = (await deps.vendorHealth?.snapshot()) ?? [];
+    } catch (error) {
+      deps.logger.warn(
+        { err: error instanceof Error ? error.message : error },
+        'vendor health snapshot failed',
+      );
+      vendors = [];
+    }
+
     res.json({
       status: 'ok',
       service: 'integration-engine',
@@ -120,7 +149,7 @@ export function createApp(deps: AppDeps): Express {
         count: deps.mappings.size(),
         loadedAt: deps.mappings.loadedAt()?.toISOString() ?? null,
       },
-      vendors: [],
+      vendors,
     });
   });
 
@@ -154,6 +183,32 @@ export function createApp(deps: AppDeps): Express {
       res.status(500).json({ error: 'mapping reload failed' });
     }
   });
+
+  /**
+   * Vendor webhook ingress.
+   *
+   * Mounted with `express.raw` matching every content type, NOT `express.json`. This is the
+   * whole point of divergence D4: HMAC is computed over the exact received bytes, and
+   * `express.json` would consume and discard them, making verification impossible. req.body
+   * is a Buffer here. A regression test asserts a json-mounted variant fails verification.
+   */
+  if (deps.webhooks !== undefined) {
+    const webhooks = deps.webhooks;
+    app.post(
+      '/webhooks/:vendor',
+      express.raw({ type: '*/*', limit: '2mb' }),
+      async (req: Request, res: Response) => {
+        const rawBody: Uint8Array = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+        const headers: Record<string, string> = {};
+        for (const [key, value] of Object.entries(req.headers)) {
+          if (typeof value === 'string') headers[key] = value;
+        }
+        const vendor = req.params.vendor ?? '';
+        const result = await webhooks.handle(vendor, rawBody, headers);
+        res.status(result.status).json(result.body);
+      },
+    );
+  }
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: 'not found' });

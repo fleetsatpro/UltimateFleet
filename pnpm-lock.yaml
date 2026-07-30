@@ -47,6 +47,12 @@ importers:
       '@deepsight/queue':
         specifier: workspace:*
         version: link:../../packages/queue
+      '@deepsight/resilience':
+        specifier: workspace:*
+        version: link:../../packages/resilience
+      '@deepsight/vendor-adapters':
+        specifier: workspace:*
+        version: link:../../packages/vendor-adapters
       express:
         specifier: ^4.21.2
         version: 4.22.2
@@ -203,6 +209,16 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/vendor-adapters:
+    dependencies:
+      '@deepsight/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
