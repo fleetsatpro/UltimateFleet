@@ -21,7 +21,8 @@
     "db:seed": "node packages/db/scripts/seed.mjs",
     "db:lint": "node packages/db/scripts/migration-lint.mjs",
     "migrate:down:up": "node packages/db/scripts/migrate-down-up.mjs",
-    "verify": "pnpm run typecheck && pnpm run lint && pnpm run format && pnpm run check:boundaries && pnpm run test && pnpm run db:lint && pnpm run migrate:down:up"
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run format && pnpm run check:boundaries && pnpm run test && pnpm run db:lint && pnpm run migrate:down:up",
+    "build": "pnpm -r build"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

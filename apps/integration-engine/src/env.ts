@@ -21,6 +21,13 @@ export const engineEnvSchema = databaseEnvSchema.extend({
   SERVICE_SECRET_CURRENT_KID: z.string().default('current'),
   SERVICE_SECRET_PREVIOUS: z.string().optional(),
   SERVICE_SECRET_PREVIOUS_KID: z.string().optional(),
+  /**
+   * Interim protection for /admin routes until Phase 7 brings supervisor sessions and
+   * RBAC. Optional in the schema, but the route FAILS CLOSED when it is absent (503)
+   * rather than serving an unauthenticated mutation endpoint — a config omission must not
+   * silently open an admin surface.
+   */
+  ADMIN_API_TOKEN: z.string().min(16).optional(),
   LOG_LEVEL: z.string().default('info'),
 });
 

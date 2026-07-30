@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import {
   newCorrelationId,
@@ -23,9 +24,57 @@ export interface AppDeps {
   readonly alerts: Alerts;
   readonly mappings: MappingCache;
   readonly startedAt: Date;
+  /**
+   * Interim bearer token guarding /admin routes until Phase 7 replaces it with supervisor
+   * sessions and RBAC. Absent means the routes refuse to serve at all — see requireAdmin.
+   */
+  readonly adminToken?: string | undefined;
 }
 
 const CORRELATION_HEADER = 'x-correlation-id';
+
+/**
+ * Guards mutating /admin routes.
+ *
+ * Fails CLOSED when no token is configured: an unauthenticated endpoint that can change how
+ * every incoming alarm is classified is not an acceptable default, and "we'll add auth in
+ * Phase 7" must not mean "it is open until then". A missing token is a 503, not a bypass.
+ *
+ * Constant-time comparison so the token cannot be recovered a byte at a time.
+ */
+function requireAdmin(deps: AppDeps) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const expected = deps.adminToken;
+    if (expected === undefined || expected === '') {
+      deps.logger.warn(
+        { path: req.path },
+        'admin route refused: ADMIN_API_TOKEN is not configured',
+      );
+      res.status(503).json({
+        error: 'admin routes are disabled: ADMIN_API_TOKEN is not configured',
+      });
+      return;
+    }
+
+    const header = req.header('authorization') ?? '';
+    const presented = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+    const expectedBytes = Buffer.from(expected, 'utf8');
+    const presentedBytes = Buffer.from(presented, 'utf8');
+
+    const ok =
+      expectedBytes.length === presentedBytes.length &&
+      timingSafeEqual(expectedBytes, presentedBytes);
+
+    if (!ok) {
+      deps.metrics.counter('admin_unauthorized_total', 1, { path: req.path });
+      deps.logger.warn({ path: req.path }, 'admin route rejected: bad or missing bearer token');
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+
+    next();
+  };
+}
 
 export function createApp(deps: AppDeps): Express {
   const app = express();
@@ -86,10 +135,9 @@ export function createApp(deps: AppDeps): Express {
    * observed vendor code and the next event is classified correctly, with no redeploy.
    * Returns the process pid so the acceptance test can prove no restart occurred.
    *
-   * Authentication arrives in Phase 7 (supervisor RBAC); until then this route must not
-   * be exposed publicly. Recorded in the phase plan rather than left implicit.
+   * Guarded by requireAdmin: a bearer token now, supervisor sessions and RBAC from Phase 7.
    */
-  app.post('/admin/mappings/reload', async (_req: Request, res: Response) => {
+  app.post('/admin/mappings/reload', requireAdmin(deps), async (_req: Request, res: Response) => {
     try {
       const count = await deps.mappings.reload();
       deps.metrics.counter('mapping_reload_total', 1);

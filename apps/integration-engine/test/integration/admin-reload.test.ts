@@ -16,6 +16,7 @@ import { createApp } from '../../src/http/app.js';
  */
 
 const PROBE_CODE = '77777';
+const ADMIN_TOKEN = 'test-admin-token-0123456789';
 
 beforeAll(() => {
   initPool({ connectionString: appDatabaseUrl(), max: 4 });
@@ -43,6 +44,7 @@ describe('AC4 — POST /admin/mappings/reload', () => {
       alerts,
       mappings: core.mappings,
       startedAt: new Date(),
+      adminToken: ADMIN_TOKEN,
     });
 
     // Before: the probe code is unknown to the cache.
@@ -67,7 +69,10 @@ describe('AC4 — POST /admin/mappings/reload', () => {
     // to reload, which is what makes reload observable rather than incidental.
     expect(core.mappings.resolve('dahua', PROBE_CODE).mapped).toBe(false);
 
-    const response = await request(app).post('/admin/mappings/reload').expect(200);
+    const response = await request(app)
+      .post('/admin/mappings/reload')
+      .set('authorization', `Bearer ${ADMIN_TOKEN}`)
+      .expect(200);
 
     expect(response.body.reloaded).toBe(sizeBefore + 1);
     // Same process: no restart happened. If the only way to pick up config were a
@@ -92,6 +97,7 @@ describe('AC4 — POST /admin/mappings/reload', () => {
       alerts,
       mappings: core.mappings,
       startedAt: new Date(),
+      adminToken: ADMIN_TOKEN,
     });
 
     const response = await request(app).get('/health').expect(200);
@@ -115,6 +121,7 @@ describe('AC4 — POST /admin/mappings/reload', () => {
       alerts,
       mappings: core.mappings,
       startedAt: new Date(),
+      adminToken: ADMIN_TOKEN,
     });
 
     capture.clear();
@@ -138,6 +145,7 @@ describe('AC4 — POST /admin/mappings/reload', () => {
       alerts,
       mappings: core.mappings,
       startedAt: new Date(),
+      adminToken: ADMIN_TOKEN,
     });
 
     const response = await request(app).get('/health').expect(200);

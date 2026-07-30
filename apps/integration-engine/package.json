@@ -5,7 +5,8 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "start": "node --experimental-strip-types src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js --banner:js=\"import{createRequire as __cr}from'module';const require=__cr(import.meta.url);\"",
+    "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@types/express": "^4.17.21",
     "supertest": "^7.0.0",
     "@types/supertest": "^6.0.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "esbuild": "^0.24.2"
   }
 }

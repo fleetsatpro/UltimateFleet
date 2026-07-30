@@ -55,13 +55,37 @@ async function main(): Promise<void> {
     },
   );
 
-  const app = createApp({ logger, metrics, alerts, mappings: core.mappings, startedAt });
+  const app = createApp({
+    logger,
+    metrics,
+    alerts,
+    mappings: core.mappings,
+    startedAt,
+    ...(env.ADMIN_API_TOKEN !== undefined ? { adminToken: env.ADMIN_API_TOKEN } : {}),
+  });
 
   const server = app.listen(env.PORT, env.BIND_HOST, () => {
     logger.info(
       { port: env.PORT, host: env.BIND_HOST, mappings: core.mappings.size() },
       'integration engine listening',
     );
+  });
+
+  /**
+   * Without this handler a bind failure surfaces as an unhandled 'error' event: a raw
+   * stack trace on stderr, no structured log line, and a confusing exit. The most likely
+   * cause in practice is BIND_HOST — Railway needs the IPv6 wildcard `::`, and an
+   * environment without IPv6 rejects it with EAFNOSUPPORT — so the message says so.
+   */
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    logger.error(
+      { err: error.message, code: error.code, host: env.BIND_HOST, port: env.PORT },
+      error.code === 'EAFNOSUPPORT' || error.code === 'EADDRNOTAVAIL'
+        ? 'failed to bind: BIND_HOST is not available in this environment ' +
+            '(Railway requires "::"; set BIND_HOST=127.0.0.1 for a local IPv4-only host)'
+        : 'failed to bind',
+    );
+    process.exit(1);
   });
 
   let shuttingDown = false;
