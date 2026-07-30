@@ -2,9 +2,9 @@
 
 import React from 'react';
 
-const FleetOpsPro = () => {
+const DeepSightPro = () => {
     // Debug verification
-    console.log('FleetOpsPro Component Mounted');
+    console.log('DeepSight Pro Component Mounted');
 
     return (
         <div>
@@ -14,4 +14,4 @@ const FleetOpsPro = () => {
     );
 };
 
-export default FleetOpsPro;
+export default DeepSightPro;
