@@ -18,4 +18,5 @@ export {
 } from './tenant.js';
 
 export * from './repositories/alarm-events.js';
+export * from './repositories/alarm-sources.js';
 export * from './repositories/enrollments.js';

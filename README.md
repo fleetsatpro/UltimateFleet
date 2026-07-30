@@ -7,15 +7,21 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phase 1 complete: foundation and tenant-isolated data layer.** 35 tests passing (10 unit, 25
-integration against real PostgreSQL). Phase 2 (ingestion core) not started.
+**Phases 1-2 complete.** 59 tests passing (12 unit, 47 integration against real PostgreSQL and
+Redis). Phase 3 (vendor adapters) not started.
+
+- **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
+  three database roles, seeds, schema guards.
+- **Phase 2** — ingestion core and observability spine: the integration engine, an ingestion
+  pipeline whose fan-out is gated on actual insertion, a hot-reloadable vendor-code mapping table,
+  signed BullMQ job envelopes, and correlation IDs threaded end to end.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
 
 ## Getting started
 
-Requires Node 22, pnpm, and a PostgreSQL 16 you can connect to as a superuser.
+Requires Node 22, pnpm, a PostgreSQL 16 you can connect to as a superuser, and a Redis 7.
 
 ```bash
 pnpm install
@@ -54,12 +60,16 @@ packages/
 ├── db/              migrations, RLS policies, withOrg()/withOrgClient(), seeds, schema guards
 ├── config-env/      zod env validation, fails hard naming the missing variable
 ├── observability/   pino JSON logging, AsyncLocalStorage correlation context, metrics
-├── test-support/    integration harness and cross-tenant assertion helpers
+├── queue/           BullMQ factories with signature verification inside the worker factory
+├── test-support/    integration harness, fake adapters, cross-tenant assertion helpers
 └── eslint-config/   shared lint config incl. the Promise.all ban and no-silent-catch rule
+
+apps/
+└── integration-engine/  ingestion pipeline, mapping cache, HTTP surface, queue consumer
 ```
 
-`apps/` arrives with Phase 2 (integration engine, AxxonSoft worker, report worker, ops dashboard,
-guard mobile).
+Still to come: the AxxonSoft worker (Phase 4), report worker (Phase 10), ops dashboard (Phase 6)
+and guard mobile app (Phase 8).
 
 ## Stack
 

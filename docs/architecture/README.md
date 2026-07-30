@@ -43,10 +43,10 @@ to reverse.
 
 ## Status
 
-Three pre-build documents complete. **Phase 1 is implemented and its full acceptance suite passes**
-(35 tests: 10 unit, 25 integration). Everything in `01` and `02` describing Phase 1 reflects the code
-as built, including the two corrections above.
+Three pre-build documents complete. **Phases 1 and 2 are implemented and their full acceptance
+suites pass** (59 tests: 12 unit, 47 integration against real PostgreSQL and Redis). Everything in
+`01` and `02` describing those phases reflects the code as built, including the corrections above.
 
-**Phase 2 is gated on `/continue`.** One decision remains outstanding and is worth settling before
-Phase 2 builds on the schema: **D6** (tenancy depth). Phase 1 was built to D6(b), multi-operator,
-which degenerates cleanly to single-operator — see `01` §1.
+**Phase 3 is gated on `/continue`.** One decision remains outstanding: **D6** (tenancy depth).
+Phases 1-2 were built to D6(b), multi-operator, which degenerates cleanly to single-operator — see
+`01` §1. It gets more expensive to reverse with each phase that builds on the schema.

@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      # Redis arrives with Phase 2 (BullMQ, sessions, Socket.io fan-out). Not declared
-      # here yet — an unused service container is just a slower build.
       postgres:
         image: postgres:16
         env:
@@ -24,6 +22,17 @@ jobs:
           --health-retries 5
         ports: ['5432:5432']
 
+      # Added in Phase 2: BullMQ. Also carries dashboard sessions and Socket.io fan-out
+      # from Phase 6 onwards.
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: ['6379:6379']
+
     env:
       # Superuser: bootstrap only (CREATE ROLE requires it).
       ADMIN_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/deepsight
@@ -31,6 +40,13 @@ jobs:
       DATABASE_URL_OWNER: postgres://deepsight_owner:owner_local_only@127.0.0.1:5432/deepsight
       # deepsight_app: every integration test, as every application query path will be.
       DATABASE_URL: postgres://deepsight_app:app_local_only@127.0.0.1:5432/deepsight
+      REDIS_URL: redis://127.0.0.1:6379
+      # Test-only signing keys. Real environments supply these from Railway variables;
+      # dual keys exercise the rotation path (verify both, sign with current).
+      SERVICE_SECRET_CURRENT: ci-current-secret
+      SERVICE_SECRET_CURRENT_KID: k2
+      SERVICE_SECRET_PREVIOUS: ci-previous-secret
+      SERVICE_SECRET_PREVIOUS_KID: k1
 
     steps:
       - uses: actions/checkout@v4
@@ -73,5 +89,8 @@ jobs:
       # policies they claim to verify.
       - run: pnpm test:integration
 
+      # Acceptance criterion A8, as the runnable command the phase plan specifies. It runs
+      # LAST and outside the test suite on purpose: it drops every table, so inside a suite
+      # that shares one database it would race every other file.
       - name: Every down() migration is reversible
         run: pnpm migrate:down:up

@@ -11,9 +11,9 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "format": "prettier --check .",
-    "test": "vitest run",
-    "test:unit": "vitest run --project unit",
-    "test:integration": "vitest run --project integration",
+    "test": "vitest run --no-file-parallelism",
+    "test:unit": "vitest run --project unit --no-file-parallelism",
+    "test:integration": "vitest run --project integration --no-file-parallelism",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "db:bootstrap": "node packages/db/scripts/bootstrap.mjs",
     "db:migrate": "node packages/db/scripts/migrate.mjs up",
@@ -21,7 +21,7 @@
     "db:seed": "node packages/db/scripts/seed.mjs",
     "db:lint": "node packages/db/scripts/migration-lint.mjs",
     "migrate:down:up": "node packages/db/scripts/migrate-down-up.mjs",
-    "verify": "pnpm run typecheck && pnpm run lint && pnpm run check:boundaries && pnpm run test"
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run format && pnpm run check:boundaries && pnpm run test && pnpm run db:lint && pnpm run migrate:down:up"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

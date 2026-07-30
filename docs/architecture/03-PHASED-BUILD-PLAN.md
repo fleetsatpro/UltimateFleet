@@ -100,7 +100,7 @@ each of which fails loudly if the corresponding control is absent:
 | A5 | 100 interleaved calls alternating orgA/orgB across a pool of 5 connections: zero cross-org rows, and no org id remains readable on a freshly checked-out connection | The GUC is transaction-local and does not leak to the next borrower of a pooled connection (`01-ARCHITECTURE.md` §7.2) |
 | A6 | `withOrgClient(orgA, clientA1)` returns zero rows belonging to clientA2, while `withOrg(orgA)` returns both clients' rows; and every tenant table has **exactly one** permissive policy | The narrowing policy is **`AS RESTRICTIVE`** so it is AND-ed. Leaving it permissive would `OR` it with org isolation and silently defeat it; making *both* restrictive returns zero rows, because an empty permissive set is false (§7.1) |
 | A7 | Same alarm event inserted twice → 1 row; the second insert reports 0 rows affected | `(vendor, vendor_event_id)` dedupe works and is detectable by the caller |
-| A8 | `pnpm run migrate:down:up` — all migrations down, then up, then schema matches a committed snapshot | Every `down()` genuinely reverses |
+| A8 | `pnpm run migrate:down:up` — all migrations down, then up, then the schema fingerprint (columns, policies incl. USING/WITH CHECK, RLS flags, indexes, routines) matches the one taken before | Every `down()` genuinely reverses. Deliberately a command rather than a suite file: it drops every table, so inside the integration suite that shares one database it would race every other file — a hazard found the hard way in Phase 2 |
 | A9 | Two active enrollments for one guard → unique violation; revoking the first, then inserting → succeeds | Partial unique index `(guard_id) WHERE revoked_at IS NULL` enforces single-active-enrollment at DB level |
 | A10 | Erase embedding (`embedding_vector = NULL`) → all of that guard's attendance and patrol rows still present and unchanged | Right-to-erasure is independent of the permanent audit trail (§11.4) |
 | A11 | Service boots with a required env var missing → non-zero exit, error naming the variable; never a silent default | Fail-hard env contract |
@@ -114,9 +114,10 @@ No vendor calls, no HTTP surface, no realtime, no mobile. Pure foundation.
 
 ---
 
-## Phase 2 — Ingestion Core & Observability Spine
+## Phase 2 — Ingestion Core & Observability Spine ✅ DELIVERED
 
-**Scope: M** · **Depends on:** Phase 1
+**Scope: M** · **Depends on:** Phase 1 · **Status:** implemented; all 7 acceptance
+criteria pass (59 tests total across Phases 1-2).
 
 Normalize, dedupe, persist and fan out alarm events through a vendor-agnostic pipeline, with
 correlation IDs threaded end to end.

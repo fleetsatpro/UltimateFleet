@@ -4,14 +4,14 @@ export default defineWorkspace([
   {
     test: {
       name: 'unit',
-      include: ['packages/*/test/unit/**/*.test.ts'],
+      include: ['packages/*/test/unit/**/*.test.ts', 'apps/*/test/unit/**/*.test.ts'],
       environment: 'node',
     },
   },
   {
     test: {
       name: 'integration',
-      include: ['packages/*/test/integration/**/*.test.ts'],
+      include: ['packages/*/test/integration/**/*.test.ts', 'apps/*/test/integration/**/*.test.ts'],
       environment: 'node',
       // Migrations and seeds are applied once, then every file shares one database.
       // Parallel files would interleave DDL with isolation assertions, so the suite is
