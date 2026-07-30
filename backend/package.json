@@ -1,1 +1,0 @@
-{\n  "name": "ultimate-fleet-backend",\n  "version": "1.0.0",\n  "description": "Backend for UltimateFleet application",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  },\n  "dependencies": {\n    "express": "^4.17.1",\n    "pg": "^8.7.3",\n    "redis": "^3.1.2"\n  },\n  "author": "fleetsatpro",\n  "license": "ISC"\n}

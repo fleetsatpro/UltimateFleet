@@ -4,23 +4,17 @@
 
 ---
 
-## 0. Placement decision required (Open Item 0)
+## 0. Placement (resolved)
 
-DeepSight is greenfield. This work is being delivered into `fleetsatpro/ultimatefleet`, which holds
-an unrelated vehicle-fleet-management prototype (`01-ARCHITECTURE.md` §0). Two options:
+DeepSight roots in `fleetsatpro/ultimatefleet`. The vehicle-fleet-management prototype that
+previously occupied the root has been **deleted in full** on instruction (`01-ARCHITECTURE.md` §0),
+so the workspace roots cleanly with no `legacy/` directory to exclude from tooling and no
+CommonJS prototype to keep out of CI.
 
-**Option A — a new repository, `fleetsatpro/deepsight` (recommended).**
-Now that the platform has its own name and identity, a product called DeepSight living in a repo
-called UltimateFleet next to someone else's fleet prototype will confuse every future reader, and it
-makes `CODEOWNERS`, branch protection and release tagging ambiguous. Re-establishing org-level
-Codespaces/Railway/Vercel wiring is a few minutes of work.
-
-**Option B — repurpose this repository.**
-Move the prototype to `legacy/fleetopspro/` untouched and root the workspace here. Keeps existing
-wiring; costs a repo whose name no longer describes its contents.
-
-I recommend **A**. **I have not moved or deleted anything.** The layout below is identical under
-either option — Option B simply adds `legacy/`.
+Existing org-level Codespaces, Railway and Vercel wiring is retained. The only loose end is
+cosmetic: the repository is still named `ultimatefleet`. Renaming it to `deepsight` is a one-click
+operation with automatic URL redirects, and is cheaper before external collaborators clone it than
+after.
 
 ---
 
@@ -35,8 +29,6 @@ either option — Option B simply adds `legacy/`.
 ├── .github/workflows/ci.yml
 ├── docs/
 │   └── architecture/                # this document set
-├── legacy/                          # Option B only
-│   └── fleetopspro/                 # existing prototype, relocated untouched
 │
 ├── apps/                            # deployable units — one per Railway service / Vercel project
 │   ├── integration-engine/          @deepsight/integration-engine
@@ -219,8 +211,8 @@ packages:
   - 'packages/*'
 ```
 
-Under Option B, `legacy/` is excluded on purpose: the prototype is CommonJS with a malformed
-`package.json` (`01-ARCHITECTURE.md` §0) and must not participate in the workspace or CI.
+Two globs, no exclusions — the deleted prototype would otherwise have needed one, since it was
+CommonJS with a malformed `package.json` that must never have participated in the workspace or CI.
 
 **`tsconfig.base.json`** — the three mandated flags plus what makes them survivable:
 ```jsonc

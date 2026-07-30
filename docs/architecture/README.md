@@ -38,6 +38,7 @@ to reverse.
 
 ## Status
 
-Three pre-build documents complete. **Phase 1 implementation is gated on `/continue`**, plus two
-decisions: **D6** (tenancy depth) and **Open Item 0** (repository placement — recommend a new
-`fleetsatpro/deepsight` repo).
+Three pre-build documents complete. The repository has been cleared of its previous
+fleet-management prototype, so DeepSight roots here with a clean tree.
+
+**Phase 1 implementation is gated on `/continue`**, plus one decision: **D6** (tenancy depth).

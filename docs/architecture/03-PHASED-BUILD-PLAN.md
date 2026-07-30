@@ -46,16 +46,16 @@ engineering capacity beyond supporting counsel, but it carries a **verified ≥6
 time** (`01-ARCHITECTURE.md` §10.1) and it hard-gates Phase 9. Starting it when Phase 9 starts stalls
 Phase 9 for two months. This is the single highest-leverage scheduling decision in the plan.
 
-**Two decisions are needed before Phase 1 begins:** **D6** (tenancy depth — see
-`01-ARCHITECTURE.md` §1) and **Open Item 0** (repository placement). D6 in particular determines
-Phase 1's schema and every acceptance test below; it is cheap to change now and expensive after
-Phase 1 ships.
+**One decision is needed before Phase 1 begins: D6** (tenancy depth — see `01-ARCHITECTURE.md` §1).
+It determines Phase 1's schema and every acceptance test below; it is cheap to change now and
+expensive after Phase 1 ships. Repository placement (formerly Open Item 0) is resolved — DeepSight
+roots in this repository, cleared of its previous contents.
 
 ---
 
 ## Phase 1 — Foundation & Tenant-Isolated Data Layer
 
-**Scope: L** · **Depends on:** nothing · **Gated on:** D6 confirmation, Open Item 0
+**Scope: L** · **Depends on:** nothing · **Gated on:** D6 confirmation
 
 One sentence: stand up the monorepo, the strict toolchain, and the complete PostgreSQL schema with
 two-level tenant isolation proven by test.
@@ -445,7 +445,7 @@ or explicitly deferring it with accepted risk. Phase 9 does not start without it
 
 | Phase | Scope | Blocked by an open item today? |
 |---|---|---|
-| P1 Foundation & Data Layer | L | **D6 + Open Item 0** |
+| P1 Foundation & Data Layer | L | **D6** |
 | P2 Ingestion Core | M | No |
 | P3 Vendor Adapters | M | Bodies only (Items 1–3); structure unblocked |
 | P4 AxxonSoft Worker | M | Body only (Item 3) |

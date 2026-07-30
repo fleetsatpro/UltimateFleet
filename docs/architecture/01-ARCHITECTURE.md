@@ -27,22 +27,27 @@ from a codebase I could inspect and learn from. I mention it only so nobody late
 having more empirical backing than they do. Each is independently justified where it appears (§7,
 §9.1, §11.4).
 
-### Repository placement (Open Item 0)
+### Repository (resolved)
 
-This work is being delivered into `fleetsatpro/ultimatefleet`, which currently contains an unrelated
-vehicle-fleet-management prototype: a 10-line `FleetOpsPro` placeholder, a 124 KB unimported
-dashboard `.txt`, and a fleet/GPS/convoy backend zip. Now that the platform has its own identity,
-I'd recommend a **new repository, `fleetsatpro/deepsight`** — a product called DeepSight living in a
-repo called UltimateFleet alongside someone else's fleet prototype will confuse every future reader,
-and the org-level Codespaces/Railway/Vercel wiring is a few minutes to re-establish.
+DeepSight lives in `fleetsatpro/ultimatefleet`, which previously held an unrelated
+vehicle-fleet-management prototype. **On instruction, all ten pre-existing files have been deleted**
+(a 10-line `FleetOpsPro` placeholder, a 124 KB unimported dashboard `.txt`, a fleet/GPS/convoy
+backend zip, and the Vite/Express scaffolding). The repository root is now empty apart from `docs/`,
+so the workspace roots here with no `legacy/` directory and no naming collision.
 
-Keeping it here is still viable if you want to repurpose the repo: move the prototype to
-`legacy/fleetopspro/` and root the workspace. **I have not moved or deleted anything.**
+The deletion is a commit, not a history rewrite — every removed file remains retrievable from git
+history, so nothing is unrecoverable if any of it is wanted later.
 
-Two incidental issues found while reading, outside this brief's scope and left untouched:
-`railway.json` commits an `API_KEY` placeholder into version control, and `backend/package.json`
-contains literal `\n` escape sequences instead of newlines — it is invalid JSON and will fail
-`npm install`.
+Two of the deleted files carried defects worth recording, since both are patterns to avoid rather
+than repeat: `railway.json` committed an `API_KEY` placeholder into version control (environment
+values belong in Railway's own config — see §9.3 and `02-REPOSITORY-STRUCTURE.md` §4), and
+`backend/package.json` contained literal `\n` escape sequences instead of newlines, making it invalid
+JSON that would have failed `npm install`.
+
+**One consequence for the repository name.** The repo is still called `ultimatefleet` while the
+product is DeepSight. That is a cosmetic mismatch rather than a blocker — GitHub redirects the old
+URL on rename, and there is now no prototype inside to justify the old name — but renaming it to
+`deepsight` before external collaborators clone it is cheaper than after.
 
 ---
 
@@ -966,7 +971,7 @@ the original register are now **resolved** by DeepSight being greenfield.
 | # | Item | Status | Blocks | Owner |
 |---|---|---|---|---|
 | **D6** | **Tenancy depth** — single-operator (`client_id` as RLS key) or multi-operator SaaS (`org_id`)? Designed for multi-operator; see §1 | **Confirm before Phase 1** | Phase 1 schema, and the shape of all compliance work | Griff |
-| **0** | **Repository placement** — new `fleetsatpro/deepsight`, or repurpose this repo with the fleet prototype moved to `legacy/`? Recommend a new repo | **Unresolved — blocks implementation** | Everything | Griff |
+| 0 | ~~Repository placement~~ | **Resolved** — DeepSight roots in this repo; all pre-existing prototype files deleted (§0). Optional follow-up: rename the repo `ultimatefleet` → `deepsight` | Nothing | — |
 | 1 | GuardTek WSDL, endpoint, auth credentials | Unresolved | GuardTek adapter body | Operator / GuardTek |
 | 2 | Dahua DSS webhook docs + signature scheme | Unresolved | Dahua adapter body | Operator / Dahua |
 | 3 | AxxonSoft stream endpoint docs | Unresolved | Axxon adapter body | Operator / AxxonSoft |
