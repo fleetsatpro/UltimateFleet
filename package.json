@@ -15,13 +15,14 @@
     "test:unit": "vitest run --project unit --no-file-parallelism",
     "test:integration": "vitest run --project integration --no-file-parallelism",
     "check:boundaries": "node scripts/check-boundaries.mjs",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
     "db:bootstrap": "node packages/db/scripts/bootstrap.mjs",
     "db:migrate": "node packages/db/scripts/migrate.mjs up",
     "db:migrate:down": "node packages/db/scripts/migrate.mjs down",
     "db:seed": "node packages/db/scripts/seed.mjs",
     "db:lint": "node packages/db/scripts/migration-lint.mjs",
     "migrate:down:up": "node packages/db/scripts/migrate-down-up.mjs",
-    "verify": "pnpm run typecheck && pnpm run lint && pnpm run format && pnpm run check:boundaries && pnpm run build && pnpm run test && pnpm run db:lint && pnpm run migrate:down:up",
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run format && pnpm run check:boundaries && pnpm run scan:secrets && pnpm run build && pnpm run test && pnpm run db:lint && pnpm run migrate:down:up",
     "build": "pnpm -r build"
   },
   "pnpm": {

@@ -1,5 +1,11 @@
 import { timingSafeEqual } from 'node:crypto';
-import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response,
+  type Router,
+} from 'express';
 import {
   newCorrelationId,
   withCorrelation,
@@ -46,6 +52,8 @@ export interface AppDeps {
   readonly webhooks?: WebhookHandler | undefined;
   /** Per-vendor adapter health for /health. Absent -> vendors reported as []. */
   readonly vendorHealth?: VendorHealthSource | undefined;
+  /** Phase 7 auth surface (dashboard login, guard enroll/refresh, admin). Absent -> not mounted. */
+  readonly authRouter?: Router | undefined;
 }
 
 const CORRELATION_HEADER = 'x-correlation-id';
@@ -124,6 +132,13 @@ export function createApp(deps: AppDeps): Express {
       next();
     });
   });
+
+  // The auth surface is mounted inside the correlation context so login, enrollment and refresh
+  // all thread a correlation id, and it carries its own JSON body parser so it does not disturb
+  // the raw-bytes webhook route (D4).
+  if (deps.authRouter !== undefined) {
+    app.use(deps.authRouter);
+  }
 
   app.get('/health', async (_req: Request, res: Response) => {
     // Per-vendor status and circuit-breaker state is what the dashboard uses to show a

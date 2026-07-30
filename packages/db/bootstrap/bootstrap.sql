@@ -31,8 +31,26 @@ BEGIN
     CREATE ROLE deepsight_readonly LOGIN PASSWORD 'readonly_local_only'
       NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
   END IF;
+
+  -- deepsight_auth: a NOLOGIN, BYPASSRLS role that OWNS the narrow SECURITY DEFINER
+  -- authentication functions (auth_lookup_user). Login by globally-unique email must read
+  -- a user before its org is known, which RLS — correctly — forbids for deepsight_app. The
+  -- standard resolution is a role that bypasses RLS reachable ONLY through an audited,
+  -- fixed-signature function, never by direct login. It is NOLOGIN, so the ONLY way to use
+  -- its privilege is to EXECUTE a function the migration explicitly grants. deepsight_owner
+  -- is made a member so the migration (run as owner) can reassign the function's ownership.
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'deepsight_auth') THEN
+    CREATE ROLE deepsight_auth NOLOGIN
+      NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
+  END IF;
 END
 $$;
+
+GRANT deepsight_auth TO deepsight_owner;
+-- CREATE (not just USAGE) because a role must hold CREATE on a schema to OWN an object in
+-- it: the migration reassigns the SECURITY DEFINER auth function to deepsight_auth. The role
+-- is NOLOGIN, so this privilege is only ever exercised through functions the migration creates.
+GRANT CREATE, USAGE ON SCHEMA public TO deepsight_auth;
 
 -- PostgreSQL 15+ no longer grants CREATE on the public schema to PUBLIC.
 GRANT CREATE, USAGE ON SCHEMA public TO deepsight_owner;

@@ -1,0 +1,22 @@
+{
+  "name": "@deepsight/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "ioredis": "^5.4.2",
+    "jose": "^6.2.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

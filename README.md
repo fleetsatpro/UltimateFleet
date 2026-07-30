@@ -7,7 +7,7 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-6 complete.** 138 tests passing across unit and integration suites (the latter against
+**Phases 1-7 complete.** 157 tests passing across unit and integration suites (the latter against
 real PostgreSQL and Redis).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
@@ -34,6 +34,12 @@ real PostgreSQL and Redis).
   isolation, revocation enforced by a heartbeat sweep, a socket fan-out replacing the Phase 2 log
   sink, and a vendor-health broadcaster. Boot-optional (headless without `DASHBOARD_SESSION_SECRET`);
   the browser dashboard UI is on the frontend track.
+- **Phase 7** — auth, RBAC and device provisioning: `@deepsight/auth` (Argon2id, hashed opaque
+  tokens, Redis sessions, guard + service JWTs, roles); dashboard login/logout with server-side
+  session revocation; RBAC-per-route from a table; supervisor-issued single-use enrollment tokens;
+  guard enroll/refresh with rotating refresh-token families and replay detection. Cross-org login
+  uses a `BYPASSRLS` `deepsight_auth` role owning one SECURITY DEFINER lookup; a repo-wide secret
+  scan (`pnpm scan:secrets`) guards against hardcoded tokens.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
@@ -83,6 +89,7 @@ packages/
 ├── resilience/      per-vendor Cockatiel policy (retry/breaker/timeout/bulkhead) + breaker sweep
 ├── vendor-adapters/ GuardTek / Dahua / Axxon, contract-first (unverified ops throw)
 ├── storage-r2/      ObjectStore port + Cloudflare R2 binding (streaming upload, signed URLs)
+├── auth/            Argon2id, hashed tokens, Redis sessions, guard + service JWTs, RBAC roles
 ├── test-support/    integration harness, fake adapters, local ObjectStore, assertion helpers
 └── eslint-config/   shared lint config incl. the Promise.all ban and no-silent-catch rule
 

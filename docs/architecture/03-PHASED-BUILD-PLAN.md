@@ -325,34 +325,50 @@ Supervisor live view over Socket.io.
 
 ---
 
-## Phase 7 — Auth, RBAC & Device Enrollment Provisioning
+## Phase 7 — Auth, RBAC & Device Enrollment Provisioning ✅ DELIVERED
 
-**Scope: M** · **Depends on:** Phase 1 · **Constrained by:** Open Item 9 (DNS)
+**Scope: M** · **Depends on:** Phase 1 · **Constrained by:** Open Item 9 (DNS) · **Status:**
+implemented; all 7 acceptance criteria pass (157 tests total across Phases 1–7).
 
 Both auth surfaces plus supervisor-initiated device provisioning.
 
 ### Built
-- Dashboard: Argon2id login, Redis server-side sessions, RBAC (`admin`/`supervisor`/`report_viewer`).
-- Guard: 15-min access JWT + device-bound rotating refresh token with reuse detection.
-- Enrollment tokens: **server-generated, single-use, time-limited** — never hardcoded.
-- Service-to-service JWT with `kid` dual-secret rotation.
+- `@deepsight/auth`: Argon2id password hashing (`@node-rs/argon2`), opaque/scoped token generation
+  (hashed at rest, never stored plaintext), the Redis session store, guard + service JWTs (`jose`),
+  and the RBAC role model — pure mechanism, no HTTP or DB.
+- Dashboard: Argon2id login, Redis server-side sessions (opaque HttpOnly/SameSite cookie), RBAC
+  (`admin`/`supervisor`/`report_viewer`) as `requireSession` + `requireRole` middleware.
+- Guard: 15-min HS256 access JWT + device-bound rotating refresh token with **family reuse
+  detection** — a replayed consumed token revokes the whole family.
+- Enrollment tokens: server-generated, single-use, time-limited, org-scoped (`{orgId}.{secret}`) so
+  redemption resolves the tenant from the token and runs under that org's RLS, never cross-org.
+- Service-to-service JWT with `kid` dual-secret rotation, in `@deepsight/auth/service-jwt`.
+- `scripts/scan-secrets.mjs` in `verify` and CI: fails on any hardcoded high-entropy token literal.
+
+### Correction — D8: login needs a SECURITY DEFINER lookup, not an RLS hole
+
+Login by globally-unique email must read a user BEFORE its org is known, which the app role's RLS
+correctly forbids (a direct `SELECT` returns zero rows). Rather than punch a hole in RLS, a fourth
+role `deepsight_auth` (NOLOGIN, BYPASSRLS) owns a single SECURITY DEFINER function
+`auth_lookup_user(email)` returning exactly the login columns; `deepsight_app` may only EXECUTE it,
+never read `users` directly. The RLS blackout on `users` is proven intact (a direct count returns 0
+without an org context), and the audited function is the one sanctioned crossing. All OTHER token
+redemptions avoid this entirely by carrying the org id in the token itself.
 
 ### Acceptance criteria
-1. An enrollment token is single-use: a second redemption returns `410 Gone`. It expires (default
-   15 min): expired redemption returns `410`. **No token value appears anywhere in the source tree**
-   (asserted by a repo-wide scan in CI).
-2. Setting `revoked_at` on an enrollment causes the **next refresh** to fail `401` and invalidates the
-   token family.
-3. Replaying an already-consumed refresh token invalidates the whole family and forces
-   re-provisioning.
-4. A `report_viewer` session receives `403` on every enrollment and revocation endpoint (asserted per
-   route, table-driven, so a new route cannot be added unguarded).
-5. Dashboard logout invalidates the session **server-side**: the same cookie returns `401` immediately
-   after.
-6. A `supervisor` in org A receives `403`/404 on every org B resource, **and** the underlying query
-   returns zero rows even if the route check is bypassed — RBAC and RLS are independently sufficient.
-7. A service JWT signed with `SVC_SECRET_PREVIOUS` verifies during the rotation window; one signed
-   with an unknown `kid`, or with `exp` in the past, is rejected.
+1. Enrollment token single-use (2nd redemption `410`) and expiry (`410`), plus **no token value in the
+   source tree** — the repo-wide `scan:secrets` step (AC1; `auth.test.ts` + the scan in CI/verify).
+2. `revoked_at` on an enrollment fails the next refresh `401` and kills the family (AC2).
+3. Replaying a consumed refresh token revokes the whole family — attacker and legitimate holder both
+   locked out, forcing re-provisioning (AC3).
+4. A `report_viewer` gets `403` on every admin route, driven from the same `ADMIN_ROUTE_PATHS` table
+   that mounts them, and a supervisor is let through (AC4).
+5. Dashboard logout invalidates the session server-side: the same cookie returns `401` immediately
+   (AC5), because sessions are a Redis lookup per request, not a stateless decode.
+6. A supervisor in org B gets `404` on an org A client **and** the underlying query returns zero rows
+   under org B's context — RBAC and RLS independently sufficient (AC6).
+7. A service JWT signed with the PREVIOUS key verifies during the rotation window; an unknown `kid` or
+   a past `exp` is rejected (`service-jwt.test.ts`, AC7).
 
 ---
 

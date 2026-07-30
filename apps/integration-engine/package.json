@@ -5,12 +5,14 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js --banner:js=\"import{createRequire as __cr}from'module';const require=__cr(import.meta.url);\"",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --external:@node-rs/argon2 --outfile=dist/index.js --banner:js=\"import{createRequire as __cr}from'module';const require=__cr(import.meta.url);\"",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@deepsight/auth": "workspace:*",
     "@deepsight/config-env": "workspace:*",
+    "@node-rs/argon2": "^2.0.2",
     "@deepsight/contracts": "workspace:*",
     "@deepsight/db": "workspace:*",
     "@deepsight/observability": "workspace:*",

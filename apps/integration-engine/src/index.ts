@@ -1,5 +1,7 @@
 import { createServer } from 'node:http';
+import { Redis } from 'ioredis';
 import { closePool, initPool } from '@deepsight/db';
+import { createSessionStore } from '@deepsight/auth';
 import { createAlerts, createLogger, createMetrics } from '@deepsight/observability';
 import { createQueueFactory, QUEUE_NAMES } from '@deepsight/queue';
 import { createR2ObjectStore } from '@deepsight/storage-r2';
@@ -14,6 +16,7 @@ import type { TypedWorker } from '@deepsight/queue';
 import { createSessionCodec, createSessionRegistry } from './realtime/session.js';
 import { createRealtimeHub, type RealtimeHub } from './realtime/hub.js';
 import { startVendorHealthBroadcast, type VendorHealthBroadcaster } from './realtime/fanout.js';
+import { createAuthRouter } from './http/auth/routes.js';
 
 /**
  * Service entrypoint.
@@ -108,6 +111,27 @@ async function main(): Promise<void> {
     },
   );
 
+  // The auth surface (Phase 7) is mounted only when a guard access secret is configured, the
+  // same boot-optional posture as R2 and the realtime hub. Its session store needs its own Redis
+  // client — the queue factory's connections are not exposed — closed on shutdown.
+  let authRedis: Redis | null = null;
+  let authRouter = undefined;
+  if (env.GUARD_ACCESS_SECRET !== undefined) {
+    authRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
+    authRouter = createAuthRouter({
+      sessionStore: createSessionStore(authRedis),
+      guardAccessSecret: env.GUARD_ACCESS_SECRET,
+      logger,
+      metrics,
+      alerts,
+      // Anything but a local IPv4 bind is a real deployment behind TLS, so mark cookies Secure.
+      secureCookies: env.BIND_HOST !== '127.0.0.1',
+    });
+    logger.info({}, 'auth surface enabled');
+  } else {
+    logger.warn({}, 'auth surface disabled: GUARD_ACCESS_SECRET not set');
+  }
+
   const app = createApp({
     logger,
     metrics,
@@ -116,6 +140,7 @@ async function main(): Promise<void> {
     startedAt,
     webhooks: core.webhooks,
     vendorHealth: core.vendorHealth,
+    ...(authRouter !== undefined ? { authRouter } : {}),
     ...(env.ADMIN_API_TOKEN !== undefined ? { adminToken: env.ADMIN_API_TOKEN } : {}),
   });
 
@@ -184,6 +209,7 @@ async function main(): Promise<void> {
     // down cleanly. With no hub, close the HTTP server directly.
     if (hub !== null) await hub.close();
     else server.close();
+    if (authRedis !== null) authRedis.disconnect();
     await queues.close();
     await closePool();
     process.exit(0);

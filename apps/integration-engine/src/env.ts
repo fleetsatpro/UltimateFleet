@@ -36,6 +36,12 @@ const engineBaseSchema = databaseEnvSchema.extend({
   DASHBOARD_SESSION_SECRET: z.string().min(16).optional(),
   /** Allowed browser origin for dashboard sockets; absent reflects the request origin. */
   DASHBOARD_ORIGIN: z.string().optional(),
+  /**
+   * HS256 secret for guard access JWTs (Phase 7). Its presence gates the whole auth surface —
+   * dashboard login, guard enroll/refresh, admin enrollment routes — so an engine without it
+   * runs without those routes rather than half-configured. Tests build the router directly.
+   */
+  GUARD_ACCESS_SECRET: z.string().min(16).optional(),
   LOG_LEVEL: z.string().default('info'),
 });
 

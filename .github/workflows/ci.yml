@@ -70,6 +70,9 @@ jobs:
       - name: apps/ vs packages/ boundaries
         run: pnpm check:boundaries
 
+      - name: No hardcoded tokens or secrets in the source tree
+        run: pnpm scan:secrets
+
       # Builds the deployable artifact. This is the step that catches a service which
       # type-checks but cannot start — the .ts-vs-.js module-resolution failure that
       # shipped in Phase 2 was invisible to typecheck and to every in-process test.

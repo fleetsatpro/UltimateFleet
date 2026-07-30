@@ -24,6 +24,42 @@ export interface EnrollmentRow {
   readonly has_embedding: boolean;
 }
 
+/**
+ * Creates a device enrollment when a supervisor's enrollment token is redeemed. No biometric
+ * yet — `embedding_vector` stays null until Phase 9 enrolls a face — so this is purely the
+ * device↔guard binding the refresh family authenticates against.
+ */
+export async function insertGuardEnrollment(
+  tx: TenantTransaction,
+  params: {
+    readonly orgId: string;
+    readonly clientId: string;
+    readonly guardId: string;
+    readonly deviceId: string;
+    readonly enrolledBy: string;
+  },
+): Promise<string> {
+  const result = await tx.query<{ id: string }>(
+    `INSERT INTO guard_enrollments (org_id, client_id, guard_id, device_id, enrolled_by)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id`,
+    [params.orgId, params.clientId, params.guardId, params.deviceId, params.enrolledBy],
+  );
+  return result.rows[0]!.id;
+}
+
+/** Loads an enrollment's revocation state by id, for the refresh path's revoke check. */
+export async function findEnrollmentById(
+  tx: TenantTransaction,
+  enrollmentId: string,
+): Promise<{ id: string; revoked_at: Date | null } | undefined> {
+  const result = await tx.query<{ id: string; revoked_at: Date | null }>(
+    `SELECT id, revoked_at FROM guard_enrollments WHERE id = $1`,
+    [enrollmentId],
+  );
+  return result.rows[0];
+}
+
 export async function findActiveEnrollment(
   tx: TenantTransaction,
   guardId: string,
