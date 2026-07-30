@@ -7,8 +7,8 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-7 complete.** 157 tests passing across unit and integration suites (the latter against
-real PostgreSQL and Redis).
+**Phases 1-7 complete; Phase 8 sync endpoint delivered.** 166 tests passing across unit and
+integration suites (the latter against real PostgreSQL and Redis).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
   three database roles, seeds, schema guards.
@@ -40,6 +40,10 @@ real PostgreSQL and Redis).
   guard enroll/refresh with rotating refresh-token families and replay detection. Cross-org login
   uses a `BYPASSRLS` `deepsight_auth` role owning one SECURITY DEFINER lookup; a repo-wide secret
   scan (`pnpm scan:secrets`) guards against hardcoded tokens.
+- **Phase 8 (sync endpoint)** — the guard mobile sync surface: guard-JWT-authenticated idempotent
+  push of offline attendance/patrol/closure events into the append-only tables (`(device_id,
+client_event_id)` dedupe), with server-authoritative haversine geofencing. The React Native app +
+  WatermelonDB is the frontend track.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).

@@ -22,3 +22,4 @@ export * from './repositories/alarm-sources.js';
 export * from './repositories/enrollments.js';
 export * from './repositories/incident-media.js';
 export * from './repositories/auth.js';
+export * from './repositories/sync.js';

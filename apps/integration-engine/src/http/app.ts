@@ -54,6 +54,8 @@ export interface AppDeps {
   readonly vendorHealth?: VendorHealthSource | undefined;
   /** Phase 7 auth surface (dashboard login, guard enroll/refresh, admin). Absent -> not mounted. */
   readonly authRouter?: Router | undefined;
+  /** Phase 8 guard sync surface (offline event push). Absent -> not mounted. */
+  readonly syncRouter?: Router | undefined;
 }
 
 const CORRELATION_HEADER = 'x-correlation-id';
@@ -138,6 +140,9 @@ export function createApp(deps: AppDeps): Express {
   // the raw-bytes webhook route (D4).
   if (deps.authRouter !== undefined) {
     app.use(deps.authRouter);
+  }
+  if (deps.syncRouter !== undefined) {
+    app.use(deps.syncRouter);
   }
 
   app.get('/health', async (_req: Request, res: Response) => {

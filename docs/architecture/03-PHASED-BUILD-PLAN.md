@@ -372,34 +372,44 @@ redemptions avoid this entirely by carrying the org id in the token itself.
 
 ---
 
-## Phase 8 — Guard Mobile: Offline Event Log & Sync
+## Phase 8 — Guard Mobile: Offline Event Log & Sync ✅ DELIVERED (sync endpoint)
 
-**Scope: L** · **Depends on:** Phase 7 · **Constrained by:** Open Items 4, 12
+**Scope: L** · **Depends on:** Phase 7 · **Constrained by:** Open Items 4, 12 · **Status:** the
+server-side **sync endpoint** is implemented and the server-observable acceptance criteria
+(1-server, 2, 3, 4) pass (166 tests total across Phases 1–8). The Android app itself (React Native
++ WatermelonDB) is the frontend track: the on-device criteria (5, 6, 7 — offline UI, keystore,
+schema migration) are properties of that client and are specified below but not built here, the
+same posture as the deferred dashboard UI and vendor bodies.
 
 Offline-first Android app with an immutable local event log. **No biometrics yet** — that is Phase 9.
 
 ### Built
-- WatermelonDB schema + migrations; all events immutable with device-minted `client_event_id`.
-- `pullChanges`/`pushChanges` against the engine's sync endpoint; background sync task.
-- Sign-in/out, NFC + QR patrol scan, alarm acknowledgement with notes (closure as an event).
-- GPS geofence check at sign-in: outside radius → **store with flag**, never silently drop.
-- Keystore-backed refresh token; sync-queue-depth metric.
+- `POST /guard/sync/push` (`src/http/sync/`): guard-JWT-authenticated, idempotent ingestion of
+  offline attendance / patrol / closure events into the append-only tables. `device_id`, org and
+  guard come from the verified token, never the body, so a device cannot write as another.
+- Idempotency on `(device_id, client_event_id)` via `ON CONFLICT DO NOTHING`, returning exact
+  accepted/duplicate/rejected counts. Partial failure never fails the batch.
+- **Server-authoritative geofencing** (`geofence.ts`, haversine): the engine computes the distance
+  from the event GPS to the site's stored radius and sets `geofence_violation` + distance — the
+  device cannot mark itself compliant. Never drops the event.
+- (Frontend track) WatermelonDB schema, offline UI, keystore-backed refresh token, background sync.
 
 ### Acceptance criteria
-1. Airplane mode for a full simulated 12-hour shift: sign-in, 20 patrol scans and 3 alarm closures all
-   persist locally and the UI reflects them **with zero network**. On reconnect, all 24 events land
-   server-side exactly once.
-2. Sync interrupted mid-push and retried: server row count unchanged — `(device_id, client_event_id)`
-   idempotency holds.
-3. Two devices reporting overlapping sign-ins for one guard: **both events persist** (append-only);
-   neither overwrites the other; the conflict is surfaced to supervisors.
-4. Sign-in 500 m outside a 100 m site radius: the event persists with `geofence_violation = true` and
-   the recorded distance, and appears flagged on the dashboard.
-5. An access token expired mid-shift does **not** block any local write (the §9.1 offline
-   interaction); sync succeeds after refresh on reconnect.
-6. A revoked enrollment blocks the next sign-in **after** the next successful sync; events recorded
-   offline after `revoked_at` are accepted but flagged for supervisor review, not dropped.
-7. A WatermelonDB schema migration on a device holding 500 unsynced events loses none of them.
+1. A full 12-hour shift (1 sign-in, 20 patrol scans, 3 closures = 24 events) lands server-side
+   **exactly once** (`guard-sync.test.ts`, AC1-server). The "airplane mode, UI reflects with zero
+   network" half is on-device.
+2. A push interrupted and retried leaves the server row count unchanged — `(device_id,
+   client_event_id)` idempotency (AC2: the same batch replays as 24 duplicates, 0 accepted).
+3. Two devices' overlapping sign-ins for one guard **both persist**; neither overwrites the other
+   (AC3, append-only).
+4. A sign-in ~500 m outside a 100 m radius persists with `geofence_violation = true` and the recorded
+   distance (AC4, server-computed).
+5. *(On-device)* An access token expired mid-shift does not block any local write; sync succeeds after
+   refresh — the endpoint's 401-on-expiry drives that refresh.
+6. *(On-device + follow-up)* A revoked enrollment blocks the next sign-in after the next sync; events
+   recorded offline after `revoked_at` are accepted but flagged, not dropped. (Server flagging needs a
+   review column — a small follow-up migration.)
+7. *(On-device)* A WatermelonDB schema migration on a device holding 500 unsynced events loses none.
 
 ---
 

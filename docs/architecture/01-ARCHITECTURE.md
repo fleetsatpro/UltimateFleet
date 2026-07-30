@@ -54,9 +54,9 @@ URL on rename, and there is now no prototype inside to justify the old name — 
 ## 1. Divergences from the brief
 
 The brief instructed me to flag divergences rather than substitute silently. Six were identified
-before the build; **D7 was discovered during the Phase 4 build** and is recorded here for the same
-reason. Four are corrections to errors or omissions in the brief, and **D6 is the one to read
-first** — it is the only one that is expensive to reverse later.
+before the build; **D7 (Phase 4) and D8 (Phase 7) were discovered during the build** and are
+recorded here for the same reason. Corrections to errors or omissions in the brief are marked as
+such, and **D6 is the one to read first** — it is the only one that is expensive to reverse later.
 
 ### D6 — Tenancy has two levels, not one (**decision needed before Phase 1**)
 
@@ -169,6 +169,18 @@ ISO string is revived, an unparseable value still fails validation, and provenan
 because jobs are HMAC-verified before ingest. Full write-up and test mapping in
 `03-PHASED-BUILD-PLAN.md` (Phase 4). This is the class of bug that only a real cross-service test
 finds; it is why Phase 4 AC4 runs over a live Redis rather than an in-process fake.
+
+### D8 — Login needs a SECURITY DEFINER lookup, not an RLS exception (**discovered in Phase 7, corrected**)
+
+Dashboard login is by globally-unique email, so it must read a `users` row BEFORE the org is known
+— which the app role's RLS correctly forbids (a direct `SELECT` under no tenant context returns zero
+rows, by design). The wrong fix is to relax RLS on `users`; the right one is a fourth role,
+`deepsight_auth` (NOLOGIN, BYPASSRLS), that OWNS a single SECURITY DEFINER function
+`auth_lookup_user(email)` returning only the login columns. `deepsight_app` may `EXECUTE` it but
+still cannot read `users` directly, so the cross-org read is confined to one audited, fixed-signature
+function with a pinned `search_path`. Every other token redemption (enrollment, refresh) sidesteps
+the problem entirely by carrying the org id in the token, so it resolves the tenant and runs under
+that org's RLS. Full write-up in `03-PHASED-BUILD-PLAN.md` (Phase 7).
 
 ---
 

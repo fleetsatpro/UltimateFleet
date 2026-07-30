@@ -17,6 +17,7 @@ import { createSessionCodec, createSessionRegistry } from './realtime/session.js
 import { createRealtimeHub, type RealtimeHub } from './realtime/hub.js';
 import { startVendorHealthBroadcast, type VendorHealthBroadcaster } from './realtime/fanout.js';
 import { createAuthRouter } from './http/auth/routes.js';
+import { createSyncRouter } from './http/sync/routes.js';
 
 /**
  * Service entrypoint.
@@ -116,6 +117,7 @@ async function main(): Promise<void> {
   // client — the queue factory's connections are not exposed — closed on shutdown.
   let authRedis: Redis | null = null;
   let authRouter = undefined;
+  let syncRouter = undefined;
   if (env.GUARD_ACCESS_SECRET !== undefined) {
     authRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
     authRouter = createAuthRouter({
@@ -127,9 +129,15 @@ async function main(): Promise<void> {
       // Anything but a local IPv4 bind is a real deployment behind TLS, so mark cookies Secure.
       secureCookies: env.BIND_HOST !== '127.0.0.1',
     });
-    logger.info({}, 'auth surface enabled');
+    syncRouter = createSyncRouter({
+      guardAccessSecret: env.GUARD_ACCESS_SECRET,
+      logger,
+      metrics,
+      alerts,
+    });
+    logger.info({}, 'auth and guard-sync surfaces enabled');
   } else {
-    logger.warn({}, 'auth surface disabled: GUARD_ACCESS_SECRET not set');
+    logger.warn({}, 'auth and guard-sync surfaces disabled: GUARD_ACCESS_SECRET not set');
   }
 
   const app = createApp({
@@ -141,6 +149,7 @@ async function main(): Promise<void> {
     webhooks: core.webhooks,
     vendorHealth: core.vendorHealth,
     ...(authRouter !== undefined ? { authRouter } : {}),
+    ...(syncRouter !== undefined ? { syncRouter } : {}),
     ...(env.ADMIN_API_TOKEN !== undefined ? { adminToken: env.ADMIN_API_TOKEN } : {}),
   });
 
