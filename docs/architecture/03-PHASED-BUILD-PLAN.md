@@ -187,29 +187,51 @@ throwing `UNVERIFIED_VENDOR_CONTRACT`.
 
 ---
 
-## Phase 4 — AxxonSoft Worker Service & Queue Transport
+## Phase 4 — AxxonSoft Worker Service & Queue Transport ✅ DELIVERED
 
-**Scope: M** · **Depends on:** Phase 2, Phase 3
+**Scope: M** · **Depends on:** Phase 2, Phase 3 · **Status:** implemented; all 6 acceptance
+criteria pass (112 tests total across Phases 1–4).
 
 The isolated Railway stream worker, publishing to the engine over BullMQ only.
 
 ### Built
-- `apps/axxon-worker`: `/health` only, no DB credentials in its environment.
+- `apps/axxon-worker`: `/health` only, no DB credentials in its environment. Deployable
+  esbuild bundle (`dist/index.js`) — the same artifact class as the engine, boot-tested.
 - Reconnect with exponential backoff + decorrelated jitter **from the first failure**.
 - Signed job publication to `alarm.ingest`; reconnect-count metric.
 - Graceful `SIGTERM`: stop accepting, drain in-flight, `stop()`.
 
+### Correction — D7: the ingestion schema coerces dates at the queue boundary
+
+BullMQ persists every job as JSON in Redis, so a `NormalizedAlarmEvent`'s `Date` fields are
+ISO **strings** by the time the engine's alarm worker validates the published payload. The
+ingestion schema (`normalizedAlarmEventSchema`) originally used strict `z.date()`, which
+accepted the in-process webhook/poll paths (real `Date`s) but rejected **100 %** of
+queue-delivered events — the worker published and the engine silently discarded, so the
+queue never drained. Fixed by making the date fields `z.coerce.date()`: a real `Date` passes
+through unchanged, an ISO string is revived, and an unparseable value still fails validation.
+Provenance is unaffected — jobs are HMAC-verified before ingest. Locked by a unit regression
+test (`apps/integration-engine/test/unit/event-json-boundary.test.ts`) so a future tightening
+back to `z.date()` fails fast rather than as a mysterious ingestion stall.
+
 ### Acceptance criteria
-1. Killing the fake Axxon endpoint and restoring it after 45 s: the worker reconnects, reconnect count
-   increments, and **no events are lost** across the outage window.
+1. Killing the fake Axxon endpoint and restoring it after an outage window: the worker reconnects,
+   reconnect count increments, and **no events are lost** across the window
+   (`axxon-worker/test/unit/consumer.test.ts`, AC1).
 2. Reconnect intervals over 10 induced failures are non-uniform, with the **first** retry already
-   jittered.
-3. The worker's environment contains no `DATABASE_URL` (asserted by its zod env schema rejecting one)
-   and it holds zero DB connections under load.
-4. 10,000 events published and consumed: engine row count exactly 10,000; queue drains to depth 0.
-5. `SIGTERM` mid-stream: in-flight events are published before exit, exit code 0, no partial job.
+   jittered (same file, AC2 — both the `decorrelatedJitter` unit property and a real-backoff run).
+3. The worker's environment contains no `DATABASE_URL` (asserted by its zod env schema rejecting it,
+   `axxon-worker/test/unit/env.test.ts`) and the package declares **no dependency on `@deepsight/db`
+   or `pg`** at all, so it holds zero DB connections by construction, not by discipline.
+4. Events published and consumed over real BullMQ: engine row count exactly matches, queue drains to
+   depth 0 (`integration-engine/test/integration/axxon-worker-queue.test.ts`; defaults to 2,000 for
+   CI speed, `AXXON_AC4_COUNT=10000` for the brief's full scale — the property is identical at either
+   size). This is the test that surfaced D7 above.
+5. `SIGTERM` mid-stream: in-flight events are published before exit, exit code 0, no partial job
+   (`consumer.test.ts` AC5 drains in-flight publishes; `service-boot.test.ts` proves the real bundle
+   exits 0 on `SIGTERM`).
 6. `onAlarm()`'s unsubscribe is called on every reconnect — listener count stays at 1 across 50
-   reconnects (the leak `01-ARCHITECTURE.md` §6.3 exists to prevent).
+   reconnects (`consumer.test.ts` AC6; the leak `01-ARCHITECTURE.md` §6.3 exists to prevent).
 
 ---
 

@@ -223,3 +223,97 @@ export function createFakeStreamAdapter(vendor: VendorId = 'axxon'): FakeStreamA
     },
   };
 }
+
+/**
+ * A controllable stream source for testing the AxxonSoft worker's reconnect behaviour.
+ *
+ * Unlike createFakeStreamAdapter, its start() BLOCKS while "connected" and only settles
+ * when the test drives it — resolving on disconnect() (a clean stream close) or rejecting
+ * when setDown(true) makes the next connect fail (an unreachable endpoint). That is what
+ * lets a test simulate a 45-second outage, count reconnects, and assert no events are lost.
+ */
+export interface ControllableStreamSource extends StreamAlarmAdapter {
+  emit(event: NormalizedAlarmEvent): void;
+  listenerCount(): number;
+  /** Number of times start() has been invoked — i.e. connection attempts. */
+  connectAttempts(): number;
+  /** Whether a connection is currently established. */
+  isConnected(): boolean;
+  /** Ends the current connection cleanly (start() resolves), simulating a dropped stream. */
+  disconnect(): void;
+  /** When true, start() rejects immediately, simulating an unreachable endpoint. */
+  setDown(down: boolean): void;
+}
+
+export function createControllableStreamSource(
+  vendor: VendorId = 'axxon',
+): ControllableStreamSource {
+  const listeners = new Set<(event: NormalizedAlarmEvent) => void>();
+  let attempts = 0;
+  let connected = false;
+  let down = false;
+  let resolveCurrent: (() => void) | null = null;
+
+  return {
+    vendor,
+    mode: 'stream',
+    healthCheck() {
+      return Promise.resolve({
+        vendor,
+        status: connected ? ('connected' as const) : ('offline' as const),
+        breaker_state: 'closed' as const,
+      });
+    },
+    start(signal) {
+      attempts += 1;
+      if (down) {
+        // Unreachable endpoint: reject so the consumer backs off and retries.
+        return Promise.reject(new Error('axxon endpoint unreachable'));
+      }
+      connected = true;
+      return new Promise<void>((resolve) => {
+        resolveCurrent = () => {
+          connected = false;
+          resolveCurrent = null;
+          resolve();
+        };
+        // A shutdown abort also ends the connection cleanly.
+        signal.addEventListener(
+          'abort',
+          () => {
+            if (resolveCurrent !== null) resolveCurrent();
+          },
+          { once: true },
+        );
+      });
+    },
+    stop() {
+      if (resolveCurrent !== null) resolveCurrent();
+      return Promise.resolve();
+    },
+    onAlarm(listener): Unsubscribe {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    emit(event) {
+      for (const listener of listeners) listener(event);
+    },
+    listenerCount() {
+      return listeners.size;
+    },
+    connectAttempts() {
+      return attempts;
+    },
+    isConnected() {
+      return connected;
+    },
+    disconnect() {
+      if (resolveCurrent !== null) resolveCurrent();
+    },
+    setDown(value) {
+      down = value;
+    },
+  };
+}

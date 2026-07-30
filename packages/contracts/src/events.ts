@@ -43,7 +43,10 @@ export type AlarmSeverity = z.infer<typeof alarmSeveritySchema>;
 export const mediaRefSchema = z.object({
   url: z.string().url(),
   kind: z.enum(['image', 'video', 'unknown']),
-  expires_at: z.date().optional(),
+  // Coerced, not strict: an event that has crossed the BullMQ boundary arrives as JSON,
+  // where a Date has become an ISO string. The in-process paths still pass a real Date,
+  // which coercion returns unchanged. See occurred_at below for the full rationale.
+  expires_at: z.coerce.date().optional(),
 });
 export interface MediaRef {
   readonly url: string;
@@ -65,8 +68,15 @@ export const normalizedAlarmEventSchema = z.object({
   site_id: z.string().uuid(),
   event_type: normalizedEventTypeSchema,
   severity: alarmSeveritySchema,
-  occurred_at: z.date(),
-  received_at: z.date(),
+  // `z.coerce.date()`, not `z.date()`, because this schema is the ingestion trust boundary
+  // and events reach it two ways: in-process (webhook/poll) carrying real Date objects, and
+  // over BullMQ, where JSON serialization has already turned every Date into an ISO string.
+  // A strict `z.date()` rejects the entire queue path — the worker publishes, the engine
+  // discards. Coercion accepts both: a Date passes through unchanged, a string is revived,
+  // and anything `new Date()` cannot parse still fails validation. Provenance is not
+  // weakened by this — queue jobs are HMAC-verified before they ever reach ingest.
+  occurred_at: z.coerce.date(),
+  received_at: z.coerce.date(),
   raw_payload: z.unknown(),
   media_urls: z.array(mediaRefSchema).readonly(),
   correlation_id: z.string().min(1),
@@ -113,7 +123,9 @@ export const normalizedAttendanceRecordSchema = z.object({
   site_id: z.string().uuid(),
   client_id: z.string().uuid(),
   event_type: attendanceEventTypeSchema,
-  occurred_at: z.date(),
+  // Coerced for the same reason as the alarm event: attendance records also cross the queue
+  // boundary, where a Date is an ISO string by the time it is validated.
+  occurred_at: z.coerce.date(),
   raw_payload: z.unknown(),
   correlation_id: z.string().min(1),
 });

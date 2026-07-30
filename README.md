@@ -7,8 +7,8 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-3 complete.** 97 tests passing (34 unit, 63 integration against real PostgreSQL and
-Redis). Phase 4 (isolated AxxonSoft worker) not started.
+**Phases 1-4 complete.** 112 tests passing across unit and integration suites (the latter against
+real PostgreSQL and Redis).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
   three database roles, seeds, schema guards.
@@ -19,6 +19,11 @@ Redis). Phase 4 (isolated AxxonSoft worker) not started.
   (stream) typed against the real interfaces with unverified operations throwing
   `UNVERIFIED_VENDOR_CONTRACT`; a corrected Cockatiel resilience policy with a circuit breaker per
   vendor; a raw-bytes webhook route; and per-vendor health on `/health`.
+- **Phase 4** — the isolated AxxonSoft worker: a separate Railway service that holds no database
+  credential (and no dependency on `@deepsight/db` at all), streams alarms, reconnects with
+  decorrelated jitter from the first failure, and publishes signed jobs to the engine over BullMQ.
+  This phase surfaced divergence D7 — the ingestion schema must coerce dates because BullMQ delivers
+  them as JSON strings — caught by a full worker→Redis→engine test.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
@@ -71,11 +76,11 @@ packages/
 └── eslint-config/   shared lint config incl. the Promise.all ban and no-silent-catch rule
 
 apps/
-└── integration-engine/  ingestion pipeline, mapping cache, HTTP surface, queue consumer
+├── integration-engine/  ingestion pipeline, mapping cache, HTTP surface, queue consumer
+└── axxon-worker/        isolated stream worker: reconnecting consumer, signed publish, no DB
 ```
 
-Still to come: the AxxonSoft worker (Phase 4), report worker (Phase 10), ops dashboard (Phase 6)
-and guard mobile app (Phase 8).
+Still to come: the report worker (Phase 10), ops dashboard (Phase 6) and guard mobile app (Phase 8).
 
 Vendor contract status is tracked in [`packages/vendor-adapters/VENDOR_TODO.md`](./packages/vendor-adapters/VENDOR_TODO.md).
 

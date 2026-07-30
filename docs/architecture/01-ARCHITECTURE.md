@@ -53,9 +53,10 @@ URL on rename, and there is now no prototype inside to justify the old name — 
 
 ## 1. Divergences from the brief
 
-The brief instructed me to flag divergences rather than substitute silently. There are six. Three
-are corrections to errors in the brief, and **D6 is the one to read first** — it is the only one
-that is expensive to reverse later.
+The brief instructed me to flag divergences rather than substitute silently. Six were identified
+before the build; **D7 was discovered during the Phase 4 build** and is recorded here for the same
+reason. Four are corrections to errors or omissions in the brief, and **D6 is the one to read
+first** — it is the only one that is expensive to reverse later.
 
 ### D6 — Tenancy has two levels, not one (**decision needed before Phase 1**)
 
@@ -155,6 +156,19 @@ credential**, typically 512 × float32 ≈ 2 KB, and it belongs in PostgreSQL be
 A bounded exception: fixed-size credential material in Postgres, all variable-size media in R2, no
 raw face image anywhere at any layer. Enforced mechanically by migration-lint
 (`02-REPOSITORY-STRUCTURE.md` §6), not by convention.
+
+### D7 — The ingestion schema coerces dates at the queue boundary (**discovered in Phase 4, corrected**)
+
+BullMQ persists jobs as JSON, so a `NormalizedAlarmEvent` published by the AxxonSoft worker reaches
+the engine with its `Date` fields already serialized to ISO **strings**. The ingestion schema used
+strict `z.date()`, which the in-process webhook/poll paths satisfied (they carry real `Date`s) but
+which rejected every event that crossed the queue — the worker published and the engine silently
+discarded. Resolution: `occurred_at`, `received_at` and `media_urls[].expires_at` (and the
+attendance record's `occurred_at`) are `z.coerce.date()`. A real `Date` passes through unchanged, an
+ISO string is revived, an unparseable value still fails validation, and provenance is unaffected
+because jobs are HMAC-verified before ingest. Full write-up and test mapping in
+`03-PHASED-BUILD-PLAN.md` (Phase 4). This is the class of bug that only a real cross-service test
+finds; it is why Phase 4 AC4 runs over a live Redis rather than an in-process fake.
 
 ---
 

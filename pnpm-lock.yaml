@@ -30,6 +30,43 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  apps/axxon-worker:
+    dependencies:
+      '@deepsight/config-env':
+        specifier: workspace:*
+        version: link:../../packages/config-env
+      '@deepsight/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@deepsight/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      '@deepsight/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
+      '@deepsight/resilience':
+        specifier: workspace:*
+        version: link:../../packages/resilience
+      '@deepsight/vendor-adapters':
+        specifier: workspace:*
+        version: link:../../packages/vendor-adapters
+      express:
+        specifier: ^4.21.2
+        version: 4.22.2
+    devDependencies:
+      '@deepsight/test-support':
+        specifier: workspace:*
+        version: link:../../packages/test-support
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      esbuild:
+        specifier: ^0.24.2
+        version: 0.24.2
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   apps/integration-engine:
     dependencies:
       '@deepsight/config-env':
