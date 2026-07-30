@@ -491,24 +491,29 @@ Scheduled per-client aggregation → HTML/CSS → PDF via a pooled Chromium → 
 
 ---
 
-## Phase 11 — Delivery Layer & Audit
+## Phase 11 — Delivery Layer & Audit ✅ DELIVERED
 
-**Scope: S** · **Depends on:** Phase 10 · **Constrained by:** Open Item 13
+**Scope: S** · **Depends on:** Phase 10 · **Constrained by:** Open Item 13 · **Status:**
+implemented; all 4 acceptance criteria pass (179 tests total). The concrete email provider is
+Open Item 13, so delivery is written against an `EmailTransport` PORT with a scripted transport
+in tests; binding a real provider (SES/Postmark/…) is a one-file addition.
 
 ### Built
-- Transactional email send of the archived PDF; `report_delivery_log` per **attempt**.
-- Bounce/failure handling; retry with backoff; `r2_archive_key` on each log row.
+- `deliverReport` (`report-worker/src/delivery.ts`): sends the archived PDF to each recipient and
+  writes `report_delivery_log` per **attempt**, append-only.
+- `sent` and `bounced` are terminal; a transient `failed` is retried with exponential backoff, each
+  attempt its own row. Delivery status is kept independent of `report_runs.status`.
+- The `EmailTransport` port isolates the provider (Open Item 13) from the retry/logging logic.
 
 ### Acceptance criteria
-1. Successful compile + **failed** delivery: `report_runs.status = 'complete'` **and**
-   `report_delivery_log.delivery_status = 'failed'` — the failed delivery does not obscure the
-   successful compilation (the separation the brief requires).
-2. Three recipients where one bounces: two `sent` rows, one `bounced` row, all three carrying the same
-   `report_run_id` and `r2_archive_key`.
-3. Delivery retried after a transient failure writes a **second** log row; the first is retained —
-   attempt history is append-only.
-4. The correlation ID from ingestion is present on the delivery log row, closing the
-   ingestion → delivery trace the brief requires.
+1. A `complete` compilation whose delivery `failed` reads as `report_runs.status = 'complete'` AND a
+   `failed` delivery row — the failed delivery does not obscure the successful compilation (AC1).
+2. Three recipients, one bouncing → two `sent`, one `bounced`, all sharing `report_run_id` and
+   `r2_archive_key` (AC2).
+3. A retried delivery writes a **second** row and retains the first — append-only attempt history
+   (AC3).
+4. The ingestion correlation id is stamped on the delivery row, closing the ingestion → delivery
+   trace (AC4).
 
 ---
 

@@ -24,3 +24,4 @@ export * from './repositories/incident-media.js';
 export * from './repositories/auth.js';
 export * from './repositories/sync.js';
 export * from './repositories/reports.js';
+export * from './repositories/report-delivery.js';

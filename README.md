@@ -7,9 +7,9 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-7 complete; Phase 8 sync endpoint and Phase 10 report engine delivered; Phase 9
-deliberately blocked (biometric compliance gate).** 175 tests passing across unit and integration
-suites (the latter against real PostgreSQL, Redis and Chromium).
+**Phases 1-7 complete; Phases 8, 10, 11 backend delivered; Phase 9 deliberately blocked
+(biometric compliance gate).** 179 tests passing across unit and integration suites (the latter
+against real PostgreSQL, Redis and Chromium).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
   three database roles, seeds, schema guards.
@@ -53,6 +53,11 @@ client_event_id)` dedupe), with server-authoritative haversine geofencing. The R
   per-client aggregation under `withOrgClient` with `Promise.allSettled` isolation, a deterministic
   HTML→PDF pipeline with normalized date metadata (byte-identical output), and a `report_runs` row on
   every outcome. Built ahead of Phase 9 since it depends only on Phases 1 and 5.
+- **Phase 11** — the delivery layer: `deliverReport` emails the archived PDF and writes
+  `report_delivery_log` per attempt (append-only), with `sent`/`bounced` terminal and transient
+  `failed` retried with backoff. Delivery status is independent of compilation status, and the
+  ingestion correlation id threads through to the delivery row. The email provider is behind an
+  `EmailTransport` port (Open Item 13).
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
