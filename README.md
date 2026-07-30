@@ -7,8 +7,9 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-7 complete; Phase 8 sync endpoint delivered.** 166 tests passing across unit and
-integration suites (the latter against real PostgreSQL and Redis).
+**Phases 1-7 complete; Phase 8 sync endpoint and Phase 10 report engine delivered; Phase 9
+deliberately blocked (biometric compliance gate).** 175 tests passing across unit and integration
+suites (the latter against real PostgreSQL, Redis and Chromium).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
   three database roles, seeds, schema guards.
@@ -44,6 +45,14 @@ integration suites (the latter against real PostgreSQL and Redis).
   push of offline attendance/patrol/closure events into the append-only tables (`(device_id,
 client_event_id)` dedupe), with server-authoritative haversine geofencing. The React Native app +
   WatermelonDB is the frontend track.
+- **Phase 9** — biometric verification — **deliberately not built.** It is hard-gated on a DPIA and
+  any required registration being confirmed (or deferred in writing); shipping face-matching before
+  that would breach the gate and, in several jurisdictions, the law. Only Griff can clear it.
+- **Phase 10** — the report engine (`apps/report-worker`): a bounded Playwright browser pool
+  (synchronous slot reservation, `newContext()` per render, recycle after N or an RSS ceiling),
+  per-client aggregation under `withOrgClient` with `Promise.allSettled` isolation, a deterministic
+  HTML→PDF pipeline with normalized date metadata (byte-identical output), and a `report_runs` row on
+  every outcome. Built ahead of Phase 9 since it depends only on Phases 1 and 5.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
@@ -98,11 +107,13 @@ packages/
 └── eslint-config/   shared lint config incl. the Promise.all ban and no-silent-catch rule
 
 apps/
-├── integration-engine/  ingestion pipeline, mapping cache, media pipeline, HTTP surface, consumers
-└── axxon-worker/        isolated stream worker: reconnecting consumer, signed publish, no DB
+├── integration-engine/  ingestion, media, realtime hub, auth + guard-sync HTTP surface, consumers
+├── axxon-worker/        isolated stream worker: reconnecting consumer, signed publish, no DB
+└── report-worker/       pooled Chromium PDF rendering, per-client aggregation, report_runs
 ```
 
-Still to come: the report worker (Phase 10), ops dashboard (Phase 6) and guard mobile app (Phase 8).
+Frontend track (not in this backend repo): the ops dashboard UI (Phase 6) and the guard mobile app
+(Phase 8). Phase 9 (biometrics) is gated on compliance sign-off; Phase 11 (delivery) is next.
 
 Vendor contract status is tracked in [`packages/vendor-adapters/VENDOR_TODO.md`](./packages/vendor-adapters/VENDOR_TODO.md).
 

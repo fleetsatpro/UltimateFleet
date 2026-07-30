@@ -1,0 +1,25 @@
+{
+  "name": "@deepsight/report-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --external:playwright --external:@node-rs/argon2 --outfile=dist/index.js --banner:js=\"import{createRequire as __cr}from'module';const require=__cr(import.meta.url);\"",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@deepsight/config-env": "workspace:*",
+    "@deepsight/db": "workspace:*",
+    "@deepsight/observability": "workspace:*",
+    "@deepsight/queue": "workspace:*",
+    "@deepsight/storage-r2": "workspace:*",
+    "playwright": "^1.62.0"
+  },
+  "devDependencies": {
+    "@deepsight/test-support": "workspace:*",
+    "typescript": "^5.7.2",
+    "esbuild": "^0.24.2"
+  }
+}

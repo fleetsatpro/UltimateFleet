@@ -58,6 +58,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Chromium for the report worker's PDF rendering tests. Without it those tests skip (they
+      # check for a browser and never fail spuriously), but CI should exercise the real thing.
+      - name: Install Playwright Chromium
+        run: pnpm --filter @deepsight/report-worker exec playwright install --with-deps chromium
+
       - name: Typecheck (strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes)
         run: pnpm -r typecheck
 
