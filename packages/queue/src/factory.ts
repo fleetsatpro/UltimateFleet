@@ -51,6 +51,12 @@ export interface TypedQueue<T> {
   /** Exposed for queue-depth metrics (brief section 3) and for draining in tests. */
   counts(): Promise<{ waiting: number; active: number; failed: number }>;
   drain(): Promise<void>;
+  /**
+   * The dead-letter review surface: jobs that exhausted their retries and are parked in the
+   * failed set. This is what a supervisor inspects to see a poison-pill event, and what proves
+   * a poison pill is quarantined rather than silently lost or endlessly reprocessed.
+   */
+  listFailed(limit?: number): Promise<ReadonlyArray<{ id: string; name: string; reason: string }>>;
 }
 
 export interface TypedWorker {
@@ -126,6 +132,14 @@ export function createQueueFactory(context: QueueContext): QueueFactory {
         },
         async drain() {
           await queue.drain();
+        },
+        async listFailed(limit = 100) {
+          const jobs = await queue.getFailed(0, Math.max(0, limit - 1));
+          return jobs.map((job) => ({
+            id: job.id ?? '',
+            name: job.name,
+            reason: job.failedReason ?? '',
+          }));
         },
       };
     },

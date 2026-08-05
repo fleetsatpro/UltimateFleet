@@ -136,6 +136,29 @@ describe('breaker sweep escalates a breaker open too long', () => {
     sweep.stop();
   });
 
+  it('fires a single resolution when an escalated breaker recovers (AC1)', () => {
+    const { logger, alerts, metrics } = deps();
+    const fake = fakePolicy('dahua');
+    const sweep = createBreakerSweep(
+      [fake.policy],
+      { logger, alerts, metrics },
+      { openBeyondMs: 60_000, intervalMs: 1_000_000 },
+    );
+
+    const openedAt = new Date('2026-06-01T00:00:00Z');
+    fake.set('open', openedAt);
+    sweep.runOnce(new Date(openedAt.getTime() + 70_000)); // escalate
+    expect(alerts.fired().filter((a) => a.name === 'vendor_breaker_open_too_long')).toHaveLength(1);
+
+    fake.set('closed', null);
+    sweep.runOnce(new Date(openedAt.getTime() + 80_000)); // recovered -> one resolution
+    sweep.runOnce(new Date(openedAt.getTime() + 90_000)); // still closed -> no repeat
+    const recovered = alerts.fired().filter((a) => a.name === 'vendor_breaker_recovered');
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]?.severity).toBe('info');
+    sweep.stop();
+  });
+
   it('clears escalation state when the breaker closes', () => {
     const { logger, alerts, metrics } = deps();
     const fake = fakePolicy('dahua');

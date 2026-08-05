@@ -53,6 +53,13 @@ export function createBreakerSweep(
       const openedAt = policy.openedAt();
 
       if (state !== 'open' || openedAt === null) {
+        // A breaker that was escalated and is now closed/half-open has RECOVERED. Fire a single
+        // resolution so an on-call who saw the outage alert also sees it clear — an alert that
+        // never resolves trains people to ignore the channel.
+        if (escalated.has(policy.vendor)) {
+          deps.alerts.fire('vendor_breaker_recovered', { severity: 'info', vendor: policy.vendor });
+          deps.logger.info({ vendor: policy.vendor }, 'vendor circuit breaker recovered');
+        }
         escalated.delete(policy.vendor);
         continue;
       }

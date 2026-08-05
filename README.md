@@ -7,8 +7,8 @@ automatically on schedule — with no manual data entry and a permanent audit tr
 
 ## Status
 
-**Phases 1-7 complete; Phases 8, 10, 11 backend delivered; Phase 9 deliberately blocked
-(biometric compliance gate).** 179 tests passing across unit and integration suites (the latter
+**Phases 1-7 complete; Phases 8, 10, 11, 12 backend delivered; Phase 9 deliberately blocked
+(biometric compliance gate).** 183 tests passing across unit and integration suites (the latter
 against real PostgreSQL, Redis and Chromium).
 
 - **Phase 1** — foundation and tenant-isolated data layer: schema, two-level row-level security,
@@ -58,6 +58,13 @@ client_event_id)` dedupe), with server-authoritative haversine geofencing. The R
   `failed` retried with backoff. Delivery status is independent of compilation status, and the
   ingestion correlation id threads through to the delivery row. The email provider is behind an
   `EmailTransport` port (Open Item 13).
+- **Phase 12** — resiliency hardening: the breaker sweep now fires a single `info`-severity
+  recovery alert alongside its existing single-fire escalation; a table-driven metric-catalog test
+  drives ingestion, resilience, Axxon reconnects, BullMQ, guard sync, reporting and delivery
+  through their real code paths and asserts every catalog metric fires; `listFailed()` exposes
+  BullMQ's failed set as the dead-letter review surface, proven against a poison-pill job that
+  doesn't stall the queue; and a sustained-rate load test (scaled for CI, full-scale via env vars)
+  asserts zero row loss and p95 fan-out latency under 2 s.
 
 → **[`docs/architecture/`](./docs/architecture/)** — architecture, repository structure, and the
 12-phase build plan. Start with the [document index](./docs/architecture/README.md).
@@ -118,7 +125,8 @@ apps/
 ```
 
 Frontend track (not in this backend repo): the ops dashboard UI (Phase 6) and the guard mobile app
-(Phase 8). Phase 9 (biometrics) is gated on compliance sign-off; Phase 11 (delivery) is next.
+(Phase 8). Phase 9 (biometrics) is gated on compliance sign-off — the only phase in the 12-phase
+plan not yet built, and it stays that way until Griff confirms the DPIA/registration prerequisite.
 
 Vendor contract status is tracked in [`packages/vendor-adapters/VENDOR_TODO.md`](./packages/vendor-adapters/VENDOR_TODO.md).
 
